@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from './components/ui/sonner';
+import { ProtectedRoute } from './components/PermissionGuard';
+import { PERMISSIONS } from './hooks/usePermissions';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -10,6 +12,7 @@ import MiembroForm from './pages/MiembroForm';
 import MiembroDetalle from './pages/MiembroDetalle';
 import Grupos from './pages/Grupos';
 import Admin from './pages/Admin';
+import POS from './pages/POS';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -42,13 +45,80 @@ function App() {
             }
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="miembros" element={<Miembros />} />
-            <Route path="miembros/nuevo" element={<MiembroForm />} />
-            <Route path="miembros/:id" element={<MiembroDetalle />} />
-            <Route path="miembros/:id/editar" element={<MiembroForm />} />
-            <Route path="grupos" element={<Grupos />} />
-            <Route path="admin" element={<Admin />} />
+            
+            {/* Dashboard - Accesible para todos los usuarios autenticados */}
+            <Route 
+              path="dashboard" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.VIEW_DASHBOARD}>
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* Miembros - Solo admin, pastor, secretaria */}
+            <Route 
+              path="miembros" 
+              element={
+                <ProtectedRoute section="miembros" redirectTo="/dashboard">
+                  <Miembros />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="miembros/nuevo" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.CREATE_MIEMBROS} redirectTo="/miembros">
+                  <MiembroForm />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="miembros/:id" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.VIEW_MIEMBROS} redirectTo="/dashboard">
+                  <MiembroDetalle />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="miembros/:id/editar" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.EDIT_MIEMBROS} redirectTo="/miembros">
+                  <MiembroForm />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* Grupos - Solo admin, pastor, secretaria */}
+            <Route 
+              path="grupos" 
+              element={
+                <ProtectedRoute section="grupos" redirectTo="/dashboard">
+                  <Grupos />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* Admin - Solo admin y TI */}
+            <Route 
+              path="admin" 
+              element={
+                <ProtectedRoute section="admin" redirectTo="/dashboard">
+                  <Admin />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* POS - Solo agente_restaurante, ayudante_restaurante, admin */}
+            <Route 
+              path="pos" 
+              element={
+                <ProtectedRoute section="pos" redirectTo="/dashboard">
+                  <POS />
+                </ProtectedRoute>
+              } 
+            />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

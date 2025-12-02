@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { CanAccessSection } from './PermissionGuard';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { 
@@ -12,7 +13,8 @@ import {
   LogOut,
   Menu,
   X,
-  Shield
+  Shield,
+  ShoppingCart
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -27,16 +29,6 @@ const Layout = () => {
     toast.success('Sesión cerrada');
     navigate('/login');
   };
-
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, testId: 'nav-dashboard' },
-    { name: 'Miembros', href: '/miembros', icon: Users, testId: 'nav-miembros' },
-    { name: 'Grupos', href: '/grupos', icon: UsersRound, testId: 'nav-grupos' },
-  ];
-
-  if (user?.role === 'admin' || user?.role === 'ti') {
-    navigation.push({ name: 'Administración', href: '/admin', icon: Shield, testId: 'nav-admin' });
-  }
 
   const isActive = (href) => location.pathname === href || location.pathname.startsWith(href + '/');
 
@@ -80,28 +72,100 @@ const Layout = () => {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.href);
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  data-testid={item.testId}
-                  className={`
-                    flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all
-                    ${active 
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' 
-                      : 'text-gray-700 hover:bg-gray-100'
-                    }
-                  `}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                </Link>
-              );
-            })}
+            {/* Dashboard - Visible para todos */}
+            <CanAccessSection section="dashboard">
+              <Link
+                to="/dashboard"
+                onClick={() => setSidebarOpen(false)}
+                data-testid="nav-dashboard"
+                className={`
+                  flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all
+                  ${isActive('/dashboard')
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' 
+                    : 'text-gray-700 hover:bg-gray-100'
+                  }
+                `}
+              >
+                <LayoutDashboard className="h-5 w-5" />
+                <span>Dashboard</span>
+              </Link>
+            </CanAccessSection>
+
+            {/* Miembros - Solo admin, pastor, secretaria */}
+            <CanAccessSection section="miembros">
+              <Link
+                to="/miembros"
+                onClick={() => setSidebarOpen(false)}
+                data-testid="nav-miembros"
+                className={`
+                  flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all
+                  ${isActive('/miembros')
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' 
+                    : 'text-gray-700 hover:bg-gray-100'
+                  }
+                `}
+              >
+                <Users className="h-5 w-5" />
+                <span>Miembros</span>
+              </Link>
+            </CanAccessSection>
+
+            {/* Grupos - Solo admin, pastor, secretaria */}
+            <CanAccessSection section="grupos">
+              <Link
+                to="/grupos"
+                onClick={() => setSidebarOpen(false)}
+                data-testid="nav-grupos"
+                className={`
+                  flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all
+                  ${isActive('/grupos')
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' 
+                    : 'text-gray-700 hover:bg-gray-100'
+                  }
+                `}
+              >
+                <UsersRound className="h-5 w-5" />
+                <span>Grupos</span>
+              </Link>
+            </CanAccessSection>
+
+            {/* POS/Restaurante - Solo agente_restaurante, ayudante_restaurante, admin */}
+            <CanAccessSection section="pos">
+              <Link
+                to="/pos"
+                onClick={() => setSidebarOpen(false)}
+                data-testid="nav-pos"
+                className={`
+                  flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all
+                  ${isActive('/pos')
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md' 
+                    : 'text-gray-700 hover:bg-gray-100'
+                  }
+                `}
+              >
+                <ShoppingCart className="h-5 w-5" />
+                <span>Restaurante</span>
+              </Link>
+            </CanAccessSection>
+
+            {/* Admin - Solo admin y TI */}
+            <CanAccessSection section="admin">
+              <Link
+                to="/admin"
+                onClick={() => setSidebarOpen(false)}
+                data-testid="nav-admin"
+                className={`
+                  flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all
+                  ${isActive('/admin')
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' 
+                    : 'text-gray-700 hover:bg-gray-100'
+                  }
+                `}
+              >
+                <Shield className="h-5 w-5" />
+                <span>Administración</span>
+              </Link>
+            </CanAccessSection>
           </nav>
 
           {/* User section */}
@@ -117,7 +181,9 @@ const Layout = () => {
                 <p className="text-sm font-medium text-gray-900 truncate">
                   {user?.name || user?.email}
                 </p>
-                <p className="text-xs text-gray-600 capitalize">{user?.role}</p>
+                <p className="text-xs text-gray-600 capitalize">
+                  {user?.role?.replace('_', ' ')}
+                </p>
               </div>
             </div>
             <Button

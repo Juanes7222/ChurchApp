@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { auth, signInWithGoogle, signOut as firebaseSignOut } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import api from '../lib/api';
+import { clearPermissionsCache } from '../hooks/usePermissions';
 
 const AuthContext = createContext(null);
 
@@ -77,6 +78,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('user');
       setUser(null);
       setFirebaseUser(null);
+      // Limpiar cache de permisos
+      clearPermissionsCache();
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;

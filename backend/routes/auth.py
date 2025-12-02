@@ -95,3 +95,29 @@ async def google_auth(auth_req: GoogleAuthRequest):
 async def get_me(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Get current user info"""
     return current_user
+
+@api_router.get("/auth/permissions")
+async def get_user_permissions(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Get current user's permissions and accessible sections"""
+    from utils.permissions import get_role_permissions, can_access_section
+    
+    user_role = current_user.get("role", "")
+    
+    # Obtener permisos del rol
+    permissions = get_role_permissions(user_role)
+    permissions_list = [perm.value for perm in permissions]
+    
+    # Obtener secciones accesibles
+    sections = {
+        "dashboard": can_access_section(user_role, "dashboard"),
+        "miembros": can_access_section(user_role, "miembros"),
+        "grupos": can_access_section(user_role, "grupos"),
+        "pos": can_access_section(user_role, "pos"),
+        "admin": can_access_section(user_role, "admin"),
+    }
+    
+    return {
+        "role": user_role,
+        "permissions": permissions_list,
+        "sections": sections
+    }

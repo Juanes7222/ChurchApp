@@ -5,6 +5,7 @@ from .observaciones import api_router as observaciones_router
 from .grupos import api_router as grupos_router
 from .dashboard import api_router as dashboard_router
 from .products import pos_router as products_router
+from .pos_reportes import pos_reportes_router
 
 __all__ = [
     "admin_router",
@@ -13,5 +14,6 @@ __all__ = [
       "observaciones_router",
       "grupos_router",
       "dashboard_router",
-      "products_router"
+      "products_router",
+      "pos_reportes_router"
 ]

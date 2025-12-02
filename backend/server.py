@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 from core import config
-from routes import admin_router, auth_router, miembos_router, observaciones_router, grupos_router, dashboard_router
+from routes import admin_router, auth_router, miembros_router, observaciones_router, grupos_router, dashboard_router, products_router
 import os
 import logging
 
@@ -30,10 +30,11 @@ async def health():
 app.include_router(api_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
-app.include_router(miembos_router, prefix="/api")
+app.include_router(miembros_router, prefix="/api")
 app.include_router(observaciones_router, prefix="/api")
 app.include_router(grupos_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
+app.include_router(products_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,

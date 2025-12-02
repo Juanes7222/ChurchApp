@@ -11,5 +11,17 @@ __all__ = [
       "MiembroCreate",
       "MiembroUpdate",
       "MiembroResponse",
-      
+      "ProductoCreate",
+      "ProductoResponse",
+      "CategoriaProducto",
+      "VentaItem",
+      "PagoVenta",
+      "Venta",
+      "CajaShiftCreate",
+      "CajaShiftResponse",
+      "UsuarioTemporalCreate",
+      "UsuarioTemporalResponse",
+      "Inventario",
+      "CuentaMiembro",
+      "MovimientoCuenta",
 ]

@@ -13,6 +13,7 @@ import MiembroDetalle from './pages/MiembroDetalle';
 import Grupos from './pages/Grupos';
 import Admin from './pages/Admin';
 import POS from './pages/POS';
+import POSVentasPage from './pages/POSVentasPage';
 import './App.css';
 
 const PrivateRoute = ({ children }) => {
@@ -116,6 +117,15 @@ function App() {
               element={
                 <ProtectedRoute section="pos" redirectTo="/dashboard">
                   <POS />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="pos/ventas" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.CREATE_SALES} redirectTo="/pos">
+                  <POSVentasPage />
                 </ProtectedRoute>
               } 
             />

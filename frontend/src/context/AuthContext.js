@@ -12,6 +12,13 @@ export const AuthProvider = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState(null);
 
   useEffect(() => {
+    // If Firebase auth is not configured, just set loading to false
+    if (!auth) {
+      console.warn('Firebase auth not configured. Authentication will not work.');
+      setLoading(false);
+      return;
+    }
+
     // Listen to Firebase auth state changes
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {

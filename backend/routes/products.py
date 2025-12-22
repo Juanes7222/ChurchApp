@@ -6,16 +6,20 @@ from models.models import (
     Venta,
     CajaShiftCreate,
     CajaShiftResponse,
+    CajaShiftClose,
     UsuarioTemporalCreate,
+    UsuarioTemporalLogin,
     UsuarioTemporalResponse,
     CategoriaProducto,
+    MeseroPin,
 )
 from core import config
-from utils.auth import require_admin, require_auth_user, create_access_token
+from utils.auth import require_admin, require_auth_user, require_any_authenticated, create_access_token
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 import bcrypt
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 pos_router = APIRouter(prefix="", tags=["pos"])
@@ -28,10 +32,12 @@ async def list_productos(
     q: Optional[str] = None,
     categoria_uuid: Optional[str] = None,
     favoritos: Optional[bool] = None,
-    activo: bool = True,
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    activo: bool = True
 ) -> Dict[str, Any]:
-    """RF-PROD-01: Listar productos con búsqueda y filtros rápidos para POS"""
+    """RF-PROD-01: Listar productos con búsqueda y filtros rápidos para POS
+    
+    NOTA: Endpoint público para permitir acceso sin autenticación (catálogo)
+    """
     try:
         query = supabase.table('productos').select('*').eq('is_deleted', False)
         
@@ -73,6 +79,15 @@ async def create_producto(
                 raise HTTPException(status_code=409, detail="Ya existe un producto con este código")
         
         data = producto.model_dump()
+        # Generar UUID para el nuevo producto
+        data['uuid'] = str(uuid.uuid4())
+        # Convertir Decimal a float para JSON serialization
+        if 'precio' in data:
+            data['precio'] = float(data['precio'])
+        # categoria_uuid ya es string, no necesita conversión
+        if not data.get('categoria_uuid'):
+            data['categoria_uuid'] = None
+            
         result = supabase.table('productos').insert(data).execute()
         
         if not result.data:
@@ -103,6 +118,15 @@ async def update_producto(
             raise HTTPException(status_code=404, detail="Producto no encontrado")
         
         data = producto.model_dump(exclude_unset=True)
+        # Convertir Decimal a float para JSON serialization
+        if 'precio' in data:
+            data['precio'] = float(data['precio'])
+        # Convertir UUID a string
+        if data.get('categoria_uuid'):
+            data['categoria_uuid'] = str(data['categoria_uuid'])
+        else:
+            data['categoria_uuid'] = None
+            
         result = supabase.table('productos').update(data).eq('uuid', producto_uuid).execute()
         
         return cast(Dict[str, Any], result.data[0])
@@ -134,10 +158,11 @@ async def delete_producto(
 # ============= CATEGORÍAS (RF-PROD-02) =============
 
 @pos_router.get("/categorias")
-async def list_categorias(
-    current_user: Dict[str, Any] = Depends(require_auth_user)
-) -> Dict[str, Any]:
-    """RF-PROD-02: Listar categorías para organización del POS"""
+async def list_categorias() -> Dict[str, Any]:
+    """RF-PROD-02: Listar categorías para organización del POS
+    
+    NOTA: Endpoint público para permitir acceso sin autenticación (catálogo)
+    """
     try:
         result = supabase.table('categorias_producto').select('*').eq('activo', True).order('orden').execute()
         return {"categorias": result.data}
@@ -153,6 +178,7 @@ async def create_categoria(
     """RF-PROD-02: Crear categoría de producto"""
     try:
         data = categoria.model_dump()
+        data['uuid'] = str(uuid.uuid4())  # Generar UUID
         result = supabase.table('categorias_producto').insert(data).execute()
         return cast(Dict[str, Any], result.data[0])
     except Exception as e:
@@ -164,14 +190,64 @@ async def create_categoria(
 @pos_router.post("/ventas")
 async def create_venta(
     venta: Venta,
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_any_authenticated)
 ) -> Dict[str, Any]:
     """RF-SALE-01/02/03: Crear venta con soporte para fiado y pagos mixtos
     
     RF-POS-GEN-03: Usa client_ticket_id para idempotencia
     RF-SALE-03: Valida límite de crédito si es fiado
+    
+    REGLA: Sin turno no hay ventas. Sin usuario no hay ventas.
     """
     try:
+        # VALIDACIÓN CRÍTICA 1: Debe existir un turno abierto
+        turno_abierto = supabase.table('caja_shift')\
+            .select('uuid')\
+            .eq('estado', 'abierta')\
+            .eq('is_deleted', False)\
+            .execute()
+        
+        if not turno_abierto.data or len(turno_abierto.data) == 0:
+            raise HTTPException(
+                status_code=400, 
+                detail="No hay turno abierto. Debe abrir un turno antes de registrar ventas."
+            )
+        
+        shift_uuid = turno_abierto.data[0]['uuid']
+        
+        # VALIDACIÓN CRÍTICA 2: Determinar vendedor_uuid
+        # Para usuarios admin de Firebase, usar su miembro_uuid si existe
+        # Para meseros temporales, usar su UUID directamente
+        if current_user.get('tipo') == 'mesero':
+            # Usuario temporal (mesero)
+            vendedor_uuid = current_user.get('sub')
+            # Validar que el usuario temporal esté activo y vigente
+            usuario_temp = supabase.table('usuarios_temporales')\
+                .select('uuid, activo')\
+                .eq('uuid', vendedor_uuid)\
+                .eq('activo', True)\
+                .execute()
+            
+            if not usuario_temp.data:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Usuario temporal inactivo o expirado"
+                )
+        else:
+            # Usuario admin de Firebase - usar miembro_uuid del token
+            vendedor_uuid = current_user.get('miembro_uuid')
+            if not vendedor_uuid:
+                # Si no tiene miembro_uuid, buscar en app_users
+                firebase_uid = current_user.get('sub')
+                user_result = supabase.table('app_users').select('miembro_uuid').eq('uid', firebase_uid).execute()
+                if user_result.data and user_result.data[0].get('miembro_uuid'):
+                    vendedor_uuid = user_result.data[0]['miembro_uuid']
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Usuario no tiene miembro asociado. Contacte al administrador."
+                    )
+        
         # Validaciones básicas
         if not venta.items or len(venta.items) == 0:
             raise HTTPException(status_code=400, detail="La venta debe tener al menos un item")
@@ -209,22 +285,60 @@ async def create_venta(
         
         # Llamar función create_sale
         actor_uuid = current_user.get('sub') or current_user.get('uid')
+        
+        # Obtener siguiente número de ticket para este turno
+        tickets_turno = supabase.table('ventas')\
+            .select('numero_ticket')\
+            .eq('shift_uuid', shift_uuid)\
+            .order('numero_ticket', desc=True)\
+            .limit(1)\
+            .execute()
+        
+        siguiente_ticket = 1
+        if tickets_turno.data and len(tickets_turno.data) > 0:
+            ultimo_ticket = tickets_turno.data[0].get('numero_ticket')
+            if ultimo_ticket:
+                siguiente_ticket = int(ultimo_ticket) + 1
+        
         payload = venta.model_dump()
+        # Agregar campos obligatorios del turno
+        payload['shift_uuid'] = shift_uuid
+        payload['vendedor_uuid'] = vendedor_uuid
+        payload['numero_ticket'] = siguiente_ticket
+        
+        # Convertir todos los Decimal a float para JSON serialization
+        for item in payload.get('items', []):
+            if 'cantidad' in item:
+                item['cantidad'] = float(item['cantidad'])
+            if 'precio_unitario' in item:
+                item['precio_unitario'] = float(item['precio_unitario'])
+            if 'descuento' in item:
+                item['descuento'] = float(item['descuento'])
+            if 'total_item' in item:
+                item['total_item'] = float(item['total_item'])
+        
+        for pago in payload.get('pagos', []):
+            if 'monto' in pago:
+                pago['monto'] = float(pago['monto'])
         
         result = supabase.rpc('create_sale', {
             'p_payload': payload,
             'p_actor_uuid': actor_uuid
         }).execute()
         
+        logger.info(f"create_sale result: {result.data}")
+        
         if not result.data or not isinstance(result.data, list) or len(result.data) == 0:
             raise HTTPException(status_code=500, detail="Error al crear venta")
         
         # Cast seguro del resultado
         venta_result = cast(Dict[str, Any], result.data[0])
+        logger.info(f"venta_result: {venta_result}")
         venta_uuid = venta_result.get('venta_uuid')
         
         if not venta_uuid:
-            raise HTTPException(status_code=500, detail="No se pudo obtener UUID de venta")
+            logger.error(f"No venta_uuid in result: {venta_result}")
+            raise HTTPException(status_code=500, detail=f"No se pudo obtener UUID de venta. Resultado: {venta_result}")
         
         # Obtener detalles de la venta creada
         venta_detail = supabase.table('ventas').select('*').eq('uuid', venta_uuid).execute()
@@ -357,20 +471,117 @@ async def open_shift(
     shift: CajaShiftCreate,
     current_user: Dict[str, Any] = Depends(require_admin)
 ) -> Dict[str, Any]:
-    """RF-SHIFT-01: Abrir nuevo turno de caja"""
+    """RF-SHIFT-01: Abrir nuevo turno de caja y crear meseros temporales
+    
+    REGLA: No se puede abrir un turno si ya existe uno abierto
+    """
     try:
-        data = shift.model_dump()
-        result = supabase.table('caja_shift').insert(data).execute()
+        # VALIDACIÓN CRÍTICA: No puede haber más de un turno abierto
+        turno_existente = supabase.table('caja_shift')\
+            .select('uuid')\
+            .eq('estado', 'abierta')\
+            .eq('is_deleted', False)\
+            .execute()
+        
+        if turno_existente.data and len(turno_existente.data) > 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Ya existe un turno abierto. Debe cerrarlo antes de abrir uno nuevo."
+            )
+        
+        import uuid as uuid_lib
+        import hashlib
+        from datetime import timezone, timedelta
+        
+        # Crear el turno
+        shift_data = shift.model_dump(exclude={'meseros'})
+        shift_data['uuid'] = str(uuid_lib.uuid4())
+        
+        if 'efectivo_inicial' in shift_data:
+            shift_data['efectivo_inicial'] = float(shift_data['efectivo_inicial'])
+        if 'apertura_por' in shift_data:
+            shift_data['apertura_por'] = str(shift_data['apertura_por'])
+        
+        result = supabase.table('caja_shift').insert(shift_data).execute()
         
         if not result.data:
             raise HTTPException(status_code=500, detail="Error al abrir shift")
         
-        return cast(Dict[str, Any], result.data[0])
+        shift_created = result.data[0]
+        
+        # Crear meseros temporales si se proporcionaron PINs
+        meseros_creados = []
+        if shift.meseros and len(shift.meseros) > 0:
+            # Obtener el próximo número de mesero
+            existing_meseros = supabase.table('usuarios_temporales')\
+                .select('username')\
+                .like('username', 'mesero_%')\
+                .execute()
+            
+            next_num = 1
+            if existing_meseros.data:
+                nums = []
+                for m in existing_meseros.data:
+                    try:
+                        num = int(m['username'].replace('mesero_', ''))
+                        nums.append(num)
+                    except:
+                        pass
+                if nums:
+                    next_num = max(nums) + 1
+            
+            # Calcular fin_validity: 4 PM hora Colombia (UTC-5)
+            from datetime import datetime
+            now_utc = datetime.now(timezone.utc)
+            # Convertir a hora Colombia (UTC-5)
+            colombia_tz = timezone(timedelta(hours=-5))
+            now_col = now_utc.astimezone(colombia_tz)
+            
+            # Establecer fin_validity a las 4 PM de hoy
+            fin_validity_col = now_col.replace(hour=16, minute=0, second=0, microsecond=0)
+            
+            # Si ya pasaron las 4 PM, establecer para mañana
+            if now_col.hour >= 16:
+                fin_validity_col = fin_validity_col + timedelta(days=1)
+            
+            # Convertir de vuelta a UTC
+            fin_validity_utc = fin_validity_col.astimezone(timezone.utc)
+            
+            for idx, mesero_pin in enumerate(shift.meseros):
+                mesero_username = f"mesero_{next_num + idx:03d}"
+                mesero_display = f"Mesero {next_num + idx}"
+                
+                # Hash del PIN (usar SHA256 simple por ahora)
+                pin_hash = hashlib.sha256(mesero_pin.pin.encode()).hexdigest()
+                
+                mesero_data = {
+                    'uuid': str(uuid_lib.uuid4()),
+                    'username': mesero_username,
+                    'display_name': mesero_display,
+                    'pin_hash': pin_hash,
+                    'creado_por_uuid': current_user.get('sub'),  # JWT usa 'sub' para el user ID
+                    'activo': True,
+                    'fin_validity': fin_validity_utc.isoformat()
+                }
+                
+                mesero_result = supabase.table('usuarios_temporales').insert(mesero_data).execute()
+                
+                if mesero_result.data:
+                    meseros_creados.append({
+                        'username': mesero_username,
+                        'display_name': mesero_display,
+                        'uuid': mesero_result.data[0]['uuid']
+                    })
+        
+        return {
+            **shift_created,
+            'meseros_creados': meseros_creados
+        }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error opening shift: {e}")
-        raise HTTPException(status_code=500, detail="Error al abrir turno")
+        raise HTTPException(status_code=500, detail=f"Error al abrir turno: {str(e)}")
 
 @pos_router.get("/caja-shifts/{shift_uuid}/summary")
 async def get_shift_summary(
@@ -394,9 +605,21 @@ async def get_shift_summary(
         ventas_result = supabase.table('ventas').select('*').eq('shift_uuid', shift_uuid).eq('is_deleted', False).execute()
         ventas = ventas_result.data or []
         
-        # Calcular totales por método de pago
-        pagos_result = supabase.rpc('fn_get_shift_payment_summary', {'p_shift_uuid': shift_uuid}).execute()
-        pagos_por_metodo = pagos_result.data if pagos_result.data else []
+        # Obtener pagos del shift
+        pagos_result = supabase.table('ventas_pago').select('*').eq('shift_uuid', shift_uuid).execute()
+        pagos = pagos_result.data or []
+        
+        # Calcular totales por método de pago manualmente
+        pagos_por_metodo = {}
+        for pago in pagos:
+            metodo = pago.get('metodo', 'efectivo')
+            monto = float(pago.get('monto', 0))
+            if metodo not in pagos_por_metodo:
+                pagos_por_metodo[metodo] = {'metodo': metodo, 'total': 0, 'cantidad': 0}
+            pagos_por_metodo[metodo]['total'] += monto
+            pagos_por_metodo[metodo]['cantidad'] += 1
+        
+        pagos_por_metodo_list = list(pagos_por_metodo.values())
         
         # Calcular totales con cast seguro
         total_ventas = sum(
@@ -416,7 +639,7 @@ async def get_shift_summary(
             "num_tickets": num_tickets,
             "total_ventas": total_ventas,
             "total_fiado": total_fiado,
-            "pagos_por_metodo": pagos_por_metodo,
+            "pagos_por_metodo": pagos_por_metodo_list,
             "ventas": ventas
         }
     except HTTPException:
@@ -425,17 +648,22 @@ async def get_shift_summary(
         logger.error(f"Error getting shift summary: {e}")
         raise HTTPException(status_code=500, detail="Error al obtener resumen de turno")
 
-@pos_router.post("/caja-shifts/{shift_uuid}/cerrar")
+@pos_router.post("/caja-shifts/{shift_uuid}/close")
 async def close_shift(
     shift_uuid: str,
-    efectivo_recuento: Decimal,
-    notas: Optional[str] = None,
+    close_data: CajaShiftClose,
     current_user: Dict[str, Any] = Depends(require_admin)
 ) -> Dict[str, str]:
-    """RF-SHIFT-02: Cerrar turno de caja con conciliación"""
+    """RF-SHIFT-02: Cerrar turno de caja con conciliación
+    
+    REGLA: Al cerrar el turno, se desactivan automáticamente todos los usuarios temporales
+    """
     try:
         actor_uuid = current_user.get('sub') or current_user.get('uid')
+        efectivo_recuento = close_data.efectivo_recuento
+        notas = close_data.notas
         
+        # Cerrar el turno
         result = supabase.table('caja_shift').update({
             'cierre_por': actor_uuid,
             'cierre_fecha': datetime.now(timezone.utc).isoformat(),
@@ -447,9 +675,22 @@ async def close_shift(
         if not result.data:
             raise HTTPException(status_code=404, detail="Shift no encontrado")
         
+        # REGLA CRÍTICA: Desactivar todos los usuarios temporales activos
+        # Los usuarios temporales mueren con el turno
+        desactivar_result = supabase.table('usuarios_temporales')\
+            .update({'activo': False})\
+            .eq('activo', True)\
+            .execute()
+        
+        usuarios_desactivados = len(desactivar_result.data) if desactivar_result.data else 0
+        
+        logger.info(f"Turno {shift_uuid} cerrado. {usuarios_desactivados} usuarios temporales desactivados.")
+        
         # TODO: Registrar en audit_logs
         
-        return {"message": "Turno cerrado exitosamente"}
+        return {
+            "message": f"Turno cerrado exitosamente. {usuarios_desactivados} meseros desactivados."
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -461,7 +702,7 @@ async def list_shifts(
     estado: Optional[str] = None,
     fecha_desde: Optional[str] = None,
     fecha_hasta: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_any_authenticated)
 ) -> Dict[str, Any]:
     """Listar turnos de caja"""
     try:
@@ -479,10 +720,40 @@ async def list_shifts(
         query = query.order('apertura_fecha', desc=True)
         result = query.execute()
         
-        return {"shifts": result.data}
+        return {"shifts": result.data or []}
     except Exception as e:
         logger.error(f"Error listing shifts: {e}")
         raise HTTPException(status_code=500, detail="Error al listar turnos")
+
+
+@pos_router.get("/caja-shifts/activo")
+async def get_active_shift() -> Dict[str, Any]:
+    """Obtener el turno actualmente abierto (si existe)
+    
+    REGLA: Solo puede haber un turno abierto a la vez
+    NOTA: Este endpoint es público para que meseros puedan verificar el turno
+    """
+    try:
+        result = supabase.table('caja_shift')\
+            .select('*')\
+            .eq('estado', 'abierta')\
+            .eq('is_deleted', False)\
+            .limit(1)\
+            .execute()
+        
+        if result.data and len(result.data) > 0:
+            return {
+                "activo": True,
+                "shift": result.data[0]
+            }
+        else:
+            return {
+                "activo": False,
+                "shift": None
+            }
+    except Exception as e:
+        logger.error(f"Error getting active shift: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener turno activo")
 
 # ============= USUARIOS TEMPORALES (RF-USER) =============
 
@@ -619,3 +890,481 @@ async def list_usuarios_temporales(
     except Exception as e:
         logger.error(f"Error listing usuarios temporales: {e}")
         raise HTTPException(status_code=500, detail="Error al listar usuarios temporales")
+
+# ============= CUENTAS DE MIEMBROS (RF-CUENTA) =============
+
+@pos_router.get("/cuentas")
+async def list_cuentas_miembro(
+    con_saldo: Optional[bool] = None,
+    q: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(require_auth_user)
+) -> Dict[str, Any]:
+    """Listar cuentas de miembros con saldos"""
+    try:
+        # Join con miembros para obtener nombre
+        query = supabase.table('cuentas_miembro').select(
+            '*, miembros!inner(uuid, nombre, apellido, email, telefono)'
+        )
+        
+        if con_saldo:
+            query = query.gt('saldo_deudor', 0)
+        
+        result = query.execute()
+        cuentas = result.data or []
+        
+        # Si hay búsqueda, filtrar por nombre/apellido del miembro
+        if q:
+            q_lower = q.lower()
+            cuentas = [
+                c for c in cuentas
+                if q_lower in c.get('miembros', {}).get('nombre', '').lower() 
+                or q_lower in c.get('miembros', {}).get('apellido', '').lower()
+            ]
+        
+        return {"cuentas": cuentas}
+    except Exception as e:
+        logger.error(f"Error listing cuentas: {e}")
+        raise HTTPException(status_code=500, detail="Error al listar cuentas")
+
+@pos_router.get("/cuentas/{miembro_uuid}")
+async def get_cuenta_miembro(
+    miembro_uuid: str,
+    current_user: Dict[str, Any] = Depends(require_auth_user)
+) -> Dict[str, Any]:
+    """Obtener cuenta de un miembro específico"""
+    try:
+        # Obtener cuenta con info del miembro
+        cuenta_result = supabase.table('cuentas_miembro').select(
+            '*, miembros!inner(uuid, nombre, apellido, email, telefono)'
+        ).eq('miembro_uuid', miembro_uuid).execute()
+        
+        if not cuenta_result.data:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+        
+        cuenta = cuenta_result.data[0]
+        
+        # Obtener historial de ventas fiadas
+        ventas_result = supabase.table('ventas').select(
+            'uuid, total, created_at, is_fiado, estado'
+        ).eq('miembro_uuid', miembro_uuid).eq('is_fiado', True).eq('is_deleted', False).order('created_at', desc=True).limit(50).execute()
+        
+        # Obtener historial de movimientos (incluye abonos)
+        movimientos_result = supabase.table('movimientos_cuenta').select('*').eq('cuenta_uuid', cuenta.get('uuid')).eq('is_deleted', False).order('fecha', desc=True).limit(50).execute()
+        
+        # Filtrar solo los pagos/abonos
+        abonos = [m for m in (movimientos_result.data or []) if m.get('tipo') == 'pago']
+        
+        return {
+            "cuenta": cuenta,
+            "ventas_fiadas": ventas_result.data or [],
+            "abonos": abonos
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting cuenta: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener cuenta")
+
+@pos_router.post("/cuentas/{miembro_uuid}/abonos")
+async def registrar_abono(
+    miembro_uuid: str,
+    monto: Decimal,
+    metodo_pago: str = "efectivo",
+    notas: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    """RF-CUENTA-01: Registrar abono a cuenta de miembro"""
+    try:
+        if monto <= 0:
+            raise HTTPException(status_code=400, detail="El monto debe ser mayor a 0")
+        
+        actor_uuid = current_user.get('sub') or current_user.get('uid')
+        
+        # Verificar que existe la cuenta
+        cuenta_result = supabase.table('cuentas_miembro').select('*').eq('miembro_uuid', miembro_uuid).execute()
+        
+        if not cuenta_result.data:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+        
+        cuenta = cuenta_result.data[0]
+        saldo_actual = float(cuenta.get('saldo_deudor', 0))
+        
+        if float(monto) > saldo_actual:
+            raise HTTPException(status_code=400, detail=f"El abono excede el saldo deudor (${saldo_actual:.2f})")
+        
+        # Registrar movimiento de tipo 'pago'
+        movimiento_data = {
+            'cuenta_uuid': cuenta.get('uuid'),
+            'tipo': 'pago',
+            'monto': float(monto),
+            'descripcion': f"Abono - {metodo_pago}" + (f" - {notas}" if notas else ""),
+            'created_by_uuid': actor_uuid,
+            'fecha': datetime.now(timezone.utc).isoformat()
+        }
+        
+        movimiento_result = supabase.table('movimientos_cuenta').insert(movimiento_data).execute()
+        
+        if not movimiento_result.data:
+            raise HTTPException(status_code=500, detail="Error al registrar abono")
+        
+        # Actualizar saldo
+        nuevo_saldo = saldo_actual - float(monto)
+        supabase.table('cuentas_miembro').update({
+            'saldo_deudor': nuevo_saldo,
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        }).eq('miembro_uuid', miembro_uuid).execute()
+        
+        return {
+            "abono": movimiento_result.data[0],
+            "saldo_anterior": saldo_actual,
+            "nuevo_saldo": nuevo_saldo
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registering abono: {e}")
+        raise HTTPException(status_code=500, detail="Error al registrar abono")
+
+# ============= REPORTES (RF-REPORT) =============
+
+@pos_router.get("/reportes/ventas")
+async def get_reporte_ventas(
+    fecha_desde: Optional[str] = None,
+    fecha_hasta: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    """RF-REPORT-02: Reporte de ventas con filtros de fecha"""
+    try:
+        query = supabase.table('ventas').select('*').eq('is_deleted', False)
+        
+        if fecha_desde:
+            query = query.gte('created_at', fecha_desde)
+        
+        if fecha_hasta:
+            query = query.lte('created_at', fecha_hasta)
+        
+        query = query.order('created_at', desc=True)
+        result = query.execute()
+        ventas = result.data or []
+        
+        # Calcular totales
+        total_ventas = sum(float(v.get('total', 0)) for v in ventas)
+        total_fiado = sum(float(v.get('total', 0)) for v in ventas if v.get('is_fiado'))
+        total_efectivo = sum(float(v.get('total', 0)) for v in ventas if not v.get('is_fiado'))
+        
+        # Agrupar por día
+        ventas_por_dia = {}
+        for v in ventas:
+            fecha = v.get('created_at', '')[:10]
+            if fecha not in ventas_por_dia:
+                ventas_por_dia[fecha] = {'total': 0, 'cantidad': 0}
+            ventas_por_dia[fecha]['total'] += float(v.get('total', 0))
+            ventas_por_dia[fecha]['cantidad'] += 1
+        
+        return {
+            "ventas": ventas,
+            "resumen": {
+                "total_ventas": total_ventas,
+                "total_fiado": total_fiado,
+                "total_efectivo": total_efectivo,
+                "num_transacciones": len(ventas)
+            },
+            "ventas_por_dia": ventas_por_dia
+        }
+    except Exception as e:
+        logger.error(f"Error getting reporte ventas: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener reporte")
+
+@pos_router.get("/reportes/productos")
+async def get_reporte_productos(
+    fecha_desde: Optional[str] = None,
+    fecha_hasta: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    """RF-REPORT-03: Reporte de productos más vendidos"""
+    try:
+        # Obtener detalles de ventas
+        query = supabase.table('venta_detalle').select(
+            '*, productos(nombre, codigo, categoria_uuid)'
+        )
+        
+        result = query.execute()
+        detalles = result.data or []
+        
+        # Agrupar por producto
+        productos_vendidos = {}
+        for d in detalles:
+            prod_uuid = d.get('producto_uuid')
+            if prod_uuid not in productos_vendidos:
+                productos_vendidos[prod_uuid] = {
+                    'producto': d.get('productos', {}),
+                    'cantidad_total': 0,
+                    'ingresos_total': 0
+                }
+            productos_vendidos[prod_uuid]['cantidad_total'] += d.get('cantidad', 0)
+            productos_vendidos[prod_uuid]['ingresos_total'] += float(d.get('subtotal', 0))
+        
+        # Ordenar por cantidad vendida
+        productos_list = sorted(
+            productos_vendidos.values(),
+            key=lambda x: x['cantidad_total'],
+            reverse=True
+        )
+        
+        return {
+            "productos_vendidos": productos_list[:20],  # Top 20
+            "total_productos": len(productos_list)
+        }
+    except Exception as e:
+        logger.error(f"Error getting reporte productos: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener reporte")
+
+# ============= INVENTARIO (RF-INV) =============
+
+@pos_router.get("/inventario")
+async def get_inventario(
+    bajo_stock: Optional[bool] = None,
+    categoria_uuid: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(require_auth_user)
+) -> Dict[str, Any]:
+    """RF-INV-01: Obtener estado del inventario"""
+    try:
+        query = supabase.table('productos').select(
+            'uuid, nombre, codigo, precio, stock, stock_minimo, activo, categoria_uuid, categorias_producto(nombre)'
+        ).eq('is_deleted', False).eq('activo', True)
+        
+        if categoria_uuid:
+            query = query.eq('categoria_uuid', categoria_uuid)
+        
+        query = query.order('nombre')
+        result = query.execute()
+        productos = result.data or []
+        
+        # Filtrar por bajo stock si se solicita
+        if bajo_stock:
+            productos = [
+                p for p in productos 
+                if p.get('stock', 0) <= p.get('stock_minimo', 0)
+            ]
+        
+        # Calcular estadísticas
+        total_productos = len(result.data or [])
+        productos_bajo_stock = len([
+            p for p in (result.data or [])
+            if p.get('stock', 0) <= p.get('stock_minimo', 0)
+        ])
+        
+        return {
+            "productos": productos,
+            "estadisticas": {
+                "total_productos": total_productos,
+                "productos_bajo_stock": productos_bajo_stock
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting inventario: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener inventario")
+
+@pos_router.put("/inventario/{producto_uuid}/ajustar")
+async def ajustar_stock(
+    producto_uuid: str,
+    nuevo_stock: int,
+    motivo: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    """RF-INV-02: Ajustar stock de producto"""
+    try:
+        if nuevo_stock < 0:
+            raise HTTPException(status_code=400, detail="El stock no puede ser negativo")
+        
+        actor_uuid = current_user.get('sub') or current_user.get('uid')
+        
+        # Obtener stock anterior
+        producto_result = supabase.table('productos').select('stock').eq('uuid', producto_uuid).execute()
+        
+        if not producto_result.data:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+        
+        stock_anterior = producto_result.data[0].get('stock', 0)
+        
+        # Actualizar stock
+        result = supabase.table('productos').update({
+            'stock': nuevo_stock,
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        }).eq('uuid', producto_uuid).execute()
+        
+        # Registrar movimiento (si existe tabla)
+        try:
+            supabase.table('movimientos_inventario').insert({
+                'producto_uuid': producto_uuid,
+                'stock_anterior': stock_anterior,
+                'stock_nuevo': nuevo_stock,
+                'diferencia': nuevo_stock - stock_anterior,
+                'motivo': motivo,
+                'usuario_uuid': actor_uuid,
+                'fecha': datetime.now(timezone.utc).isoformat()
+            }).execute()
+        except:
+            pass  # Tabla opcional
+        
+        return {
+            "producto_uuid": producto_uuid,
+            "stock_anterior": stock_anterior,
+            "stock_nuevo": nuevo_stock,
+            "diferencia": nuevo_stock - stock_anterior
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adjusting stock: {e}")
+        raise HTTPException(status_code=500, detail="Error al ajustar stock")
+
+
+# ============= MESEROS TEMPORALES =============
+
+@pos_router.post("/meseros/login")
+async def login_mesero(
+    credentials: UsuarioTemporalLogin
+) -> Dict[str, Any]:
+    """Autenticar mesero con username y PIN"""
+    try:
+        import hashlib
+        from datetime import timezone
+        
+        # Buscar mesero
+        result = supabase.table('usuarios_temporales')\
+            .select('*')\
+            .eq('username', credentials.username)\
+            .eq('activo', True)\
+            .eq('is_deleted', False)\
+            .execute()
+        
+        if not result.data or len(result.data) == 0:
+            raise HTTPException(status_code=401, detail="Usuario o PIN incorrecto")
+        
+        mesero = result.data[0]
+        
+        # Verificar validez temporal
+        if mesero.get('fin_validity'):
+            fin_validity = datetime.fromisoformat(mesero['fin_validity'].replace('Z', '+00:00'))
+            if datetime.now(timezone.utc) > fin_validity:
+                raise HTTPException(status_code=401, detail="Usuario temporal expirado")
+        
+        # Verificar PIN
+        pin_hash = hashlib.sha256(credentials.pin.encode()).hexdigest()
+        if pin_hash != mesero.get('pin_hash'):
+            raise HTTPException(status_code=401, detail="Usuario o PIN incorrecto")
+        
+        # Crear token JWT para el mesero
+        access_token = create_access_token(
+            data={
+                "sub": mesero['uuid'],
+                "tipo": "mesero",
+                "username": mesero['username'],
+                "permisos": ['crear_ventas', 'crear_clientes_temporales']
+            },
+            expires_delta=timedelta(hours=12)
+        )
+        
+        # Retornar datos del mesero con token
+        return {
+            'access_token': access_token,
+            'token_type': 'bearer',
+            'uuid': mesero['uuid'],
+            'username': mesero['username'],
+            'display_name': mesero['display_name'],
+            'tipo': 'mesero',
+            'permisos': ['crear_ventas', 'crear_clientes_temporales']
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error login mesero: {e}")
+        raise HTTPException(status_code=500, detail="Error al autenticar")
+
+
+@pos_router.get("/meseros")
+async def get_meseros_activos(
+    current_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Obtener lista de meseros activos"""
+    try:
+        from datetime import timezone
+        
+        result = supabase.table('usuarios_temporales')\
+            .select('uuid, username, display_name, activo, inicio_validity, fin_validity')\
+            .eq('activo', True)\
+            .eq('is_deleted', False)\
+            .order('created_at', desc=True)\
+            .execute()
+        
+        meseros = result.data or []
+        
+        # Filtrar los que aún están vigentes
+        now = datetime.now(timezone.utc)
+        meseros_vigentes = []
+        for m in meseros:
+            if m.get('fin_validity'):
+                fin = datetime.fromisoformat(m['fin_validity'].replace('Z', '+00:00'))
+                if now <= fin:
+                    meseros_vigentes.append(m)
+            else:
+                meseros_vigentes.append(m)
+        
+        return {
+            'meseros': meseros_vigentes,
+            'total': len(meseros_vigentes)
+        }
+    except Exception as e:
+        logger.error(f"Error getting meseros: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener meseros")
+
+
+@pos_router.post("/meseros/{mesero_uuid}/desactivar")
+async def desactivar_mesero(
+    mesero_uuid: str,
+    current_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Desactivar manualmente un mesero temporal"""
+    try:
+        result = supabase.table('usuarios_temporales')\
+            .update({'activo': False})\
+            .eq('uuid', mesero_uuid)\
+            .execute()
+        
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Mesero no encontrado")
+        
+        return {"message": "Mesero desactivado exitosamente"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deactivating mesero: {e}")
+        raise HTTPException(status_code=500, detail="Error al desactivar mesero")
+
+
+@pos_router.post("/meseros/cerrar-expirados")
+async def cerrar_meseros_expirados(
+    current_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Cerrar todos los meseros cuya validez haya expirado (usar en cron job)"""
+    try:
+        from datetime import timezone
+        
+        now = datetime.now(timezone.utc).isoformat()
+        
+        result = supabase.table('usuarios_temporales')\
+            .update({'activo': False})\
+            .eq('activo', True)\
+            .lt('fin_validity', now)\
+            .execute()
+        
+        cantidad = len(result.data) if result.data else 0
+        
+        return {
+            'message': f'{cantidad} meseros expirados desactivados',
+            'cantidad': cantidad
+        }
+    except Exception as e:
+        logger.error(f"Error closing expired meseros: {e}")
+        raise HTTPException(status_code=500, detail="Error al cerrar meseros expirados")

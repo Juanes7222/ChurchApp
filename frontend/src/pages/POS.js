@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePermissions, PERMISSIONS, ROLES } from '../hooks/usePermissions';
 import { Can, HasRole } from '../components/PermissionGuard';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
+import usePOSStore from '../stores/posStore';
 import { 
   ShoppingCart, 
   Package, 
@@ -13,11 +15,21 @@ import {
   Settings,
   FileText,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Play
 } from 'lucide-react';
 
 const POS = () => {
+  const navigate = useNavigate();
   const { role, hasPermission } = usePermissions();
+  const currentShift = usePOSStore(state => state.currentShift);
+  const loadActiveShift = usePOSStore(state => state.loadActiveShift);
+  
+  // Cargar turno activo al montar el componente
+  useEffect(() => {
+    loadActiveShift();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -36,22 +48,50 @@ const POS = () => {
         </Badge>
       </div>
 
-      {/* Información de desarrollo */}
-      <Card className="bg-blue-50 border-blue-200">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
-            <div>
-              <p className="font-medium text-blue-900">
-                Módulo en Desarrollo
-              </p>
-              <p className="text-sm text-blue-700 mt-1">
-                El módulo POS está actualmente en desarrollo. Aquí se implementarán todas las funcionalidades del restaurante.
-              </p>
+      {/* Estado del turno */}
+      {currentShift ? (
+        <Card className="bg-green-50 border-green-200">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <Play className="h-5 w-5 text-green-600 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-green-900">
+                  Turno Activo
+                </p>
+                <p className="text-sm text-green-700 mt-1">
+                  Puedes realizar ventas. El turno se abrió el {new Date(currentShift.apertura_fecha).toLocaleString('es-ES')}.
+                </p>
+              </div>
+              <Button onClick={() => navigate('/pos/ventas')}>
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Ir a Ventas
+              </Button>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-yellow-900">
+                  No hay turno activo
+                </p>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Debes abrir un turno de caja antes de poder realizar ventas.
+                </p>
+              </div>
+              <Can permission={PERMISSIONS.OPEN_SHIFT}>
+                <Button onClick={() => navigate('/pos/turnos')}>
+                  <Clock className="h-4 w-4 mr-2" />
+                  Abrir Turno
+                </Button>
+              </Can>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Funcionalidades disponibles según rol */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -68,9 +108,13 @@ const POS = () => {
               <p className="text-sm text-gray-600 mb-4">
                 Crear y gestionar ventas del restaurante
               </p>
-              <Button className="w-full" disabled>
+              <Button 
+                className="w-full" 
+                onClick={() => navigate('/pos/ventas')}
+                disabled={!currentShift}
+              >
                 <ShoppingCart className="h-4 w-4 mr-2" />
-                Próximamente
+                {currentShift ? 'Ir a Ventas' : 'Requiere turno activo'}
               </Button>
             </CardContent>
           </Card>
@@ -89,9 +133,13 @@ const POS = () => {
               <p className="text-sm text-gray-600 mb-4">
                 Ver y gestionar el catálogo de productos
               </p>
-              <Button className="w-full" variant="outline" disabled>
+              <Button 
+                className="w-full" 
+                variant="outline" 
+                onClick={() => navigate('/pos/productos')}
+              >
                 <Package className="h-4 w-4 mr-2" />
-                Próximamente
+                Ver Productos
               </Button>
             </CardContent>
           </Card>
@@ -110,9 +158,13 @@ const POS = () => {
               <p className="text-sm text-gray-600 mb-4">
                 Consultar cuentas y saldos de miembros
               </p>
-              <Button className="w-full" variant="outline" disabled>
+              <Button 
+                className="w-full" 
+                variant="outline" 
+                onClick={() => navigate('/pos/cuentas')}
+              >
                 <Users className="h-4 w-4 mr-2" />
-                Próximamente
+                Ver Cuentas
               </Button>
             </CardContent>
           </Card>
@@ -131,9 +183,13 @@ const POS = () => {
               <p className="text-sm text-gray-600 mb-4">
                 Crear, editar y eliminar productos
               </p>
-              <Button className="w-full" variant="outline" disabled>
+              <Button 
+                className="w-full" 
+                variant="outline" 
+                onClick={() => navigate('/pos/productos')}
+              >
                 <Settings className="h-4 w-4 mr-2" />
-                Próximamente
+                Gestionar Productos
               </Button>
             </CardContent>
           </Card>
@@ -152,9 +208,13 @@ const POS = () => {
               <p className="text-sm text-gray-600 mb-4">
                 Actualizar precios de productos
               </p>
-              <Button className="w-full" variant="outline" disabled>
+              <Button 
+                className="w-full" 
+                variant="outline" 
+                onClick={() => navigate('/pos/productos')}
+              >
                 <DollarSign className="h-4 w-4 mr-2" />
-                Próximamente
+                Editar Precios
               </Button>
             </CardContent>
           </Card>
@@ -173,9 +233,13 @@ const POS = () => {
               <p className="text-sm text-gray-600 mb-4">
                 Abrir y cerrar turnos de caja
               </p>
-              <Button className="w-full" variant="outline" disabled>
+              <Button 
+                className="w-full" 
+                variant="outline" 
+                onClick={() => navigate('/pos/turnos')}
+              >
                 <Clock className="h-4 w-4 mr-2" />
-                Próximamente
+                Gestionar Turnos
               </Button>
             </CardContent>
           </Card>
@@ -194,9 +258,13 @@ const POS = () => {
               <p className="text-sm text-gray-600 mb-4">
                 Ver reportes de ventas y estadísticas
               </p>
-              <Button className="w-full" variant="outline" disabled>
+              <Button 
+                className="w-full" 
+                variant="outline" 
+                onClick={() => navigate('/pos/reportes')}
+              >
                 <FileText className="h-4 w-4 mr-2" />
-                Próximamente
+                Ver Reportes
               </Button>
             </CardContent>
           </Card>
@@ -215,9 +283,13 @@ const POS = () => {
               <p className="text-sm text-gray-600 mb-4">
                 Consultar stock disponible
               </p>
-              <Button className="w-full" variant="outline" disabled>
+              <Button 
+                className="w-full" 
+                variant="outline" 
+                onClick={() => navigate('/pos/inventario')}
+              >
                 <TrendingUp className="h-4 w-4 mr-2" />
-                Próximamente
+                Ver Inventario
               </Button>
             </CardContent>
           </Card>
@@ -243,32 +315,6 @@ const POS = () => {
           </CardContent>
         </Card>
       </HasRole>
-
-      {/* Referencias */}
-      <Card>
-        <CardHeader>
-          <CardTitle>📚 Documentación de Implementación</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-sm text-gray-600">
-            Para implementar las funcionalidades del POS, consulta:
-          </p>
-          <ul className="list-disc list-inside space-y-1 text-sm text-gray-600 ml-2">
-            <li>
-              <code className="text-xs bg-gray-100 px-2 py-1 rounded">FRONTEND_POS_GUIDE.md</code> - 
-              Guía completa de implementación del frontend
-            </li>
-            <li>
-              <code className="text-xs bg-gray-100 px-2 py-1 rounded">backend/routes/products.py</code> - 
-              Endpoints de productos, ventas y turnos
-            </li>
-            <li>
-              <code className="text-xs bg-gray-100 px-2 py-1 rounded">backend/routes/pos_reportes.py</code> - 
-              Endpoints de inventario y reportes
-            </li>
-          </ul>
-        </CardContent>
-      </Card>
     </div>
   );
 };

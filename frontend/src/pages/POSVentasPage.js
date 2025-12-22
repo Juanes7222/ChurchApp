@@ -21,25 +21,84 @@ import { toast } from 'sonner';
  * Combina el catálogo de productos y el panel del ticket
  */
 const POSVentasPage = () => {
+  console.log('POSVentasPage: Component mounted');
   const navigate = useNavigate();
   const { user } = useAuth();
+  
+  // Detectar si es un mesero (sin Firebase auth)
+  const [meseroSession, setMeseroSession] = useState(null);
+  
+  useEffect(() => {
+    const meseroData = localStorage.getItem('mesero_session');
+    if (meseroData) {
+      try {
+        setMeseroSession(JSON.parse(meseroData));
+      } catch (e) {
+        console.error('Error parsing mesero session:', e);
+      }
+    }
+  }, []);
   
   const currentShift = usePOSStore(state => state.currentShift);
   const vendedor = usePOSStore(state => state.vendedor);
   const currentTicket = usePOSStore(state => state.currentTicket);
   const newTicket = usePOSStore(state => state.newTicket);
+  const initializeShift = usePOSStore(state => state.initializeShift);
+  const loadActiveShift = usePOSStore(state => state.loadActiveShift);
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-
-  // Verificar que hay turno activo
+  const [shiftChecked, setShiftChecked] = useState(false);
+  
+  // Cargar turno activo al montar SIEMPRE
   useEffect(() => {
-    if (!currentShift) {
+    const checkShift = async () => {
+      console.log('POSVentasPage: Checking active shift...');
+      const shift = await loadActiveShift();
+      console.log('POSVentasPage: Active shift result:', shift);
+      setShiftChecked(true);
+    };
+    checkShift();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Array vacío para ejecutar solo al montar
+  
+  // Inicializar vendedor desde sesión de mesero o admin
+  useEffect(() => {
+    if (currentShift && !vendedor) {
+      if (meseroSession) {
+        // Crear objeto vendedor desde mesero
+        const meseroVendedor = {
+          uuid: meseroSession.uuid,
+          nombre: meseroSession.display_name,
+          tipo: 'mesero'
+        };
+        initializeShift(currentShift, meseroVendedor);
+      } else if (user) {
+        // Crear objeto vendedor desde usuario admin de Firebase
+        const userData = JSON.parse(localStorage.getItem('user') || '{}');
+        const adminVendedor = {
+          uuid: userData.uuid || user.uid,
+          nombre: userData.nombre || user.email,
+          tipo: 'admin'
+        };
+        console.log('Inicializando vendedor admin:', adminVendedor);
+        initializeShift(currentShift, adminVendedor);
+      }
+    }
+  }, [meseroSession, user, vendedor, currentShift, initializeShift]);
+  
+  // Nombre del usuario actual (Firebase o mesero)
+  const currentUserName = meseroSession?.display_name || vendedor?.nombre || user?.email || 'Sin vendedor';
+
+  // Verificar que hay turno activo (solo después de haber chequeado)
+  useEffect(() => {
+    if (shiftChecked && !currentShift) {
+      console.log('POSVentasPage: No active shift, redirecting...');
       toast.error('No hay turno activo', {
         description: 'Debes abrir un turno antes de realizar ventas',
       });
       navigate('/pos');
     }
-  }, [currentShift, navigate]);
+  }, [currentShift, navigate, shiftChecked]);
 
   // Atajos de teclado
   useEffect(() => {
@@ -76,6 +135,22 @@ const POSVentasPage = () => {
       newTicket();
     }
   };
+  
+  const handleLogout = () => {
+    if (meseroSession) {
+      if (currentTicket && currentTicket.items.length > 0) {
+        if (!window.confirm('Hay una venta en curso. ¿Estás seguro de cerrar sesión?')) {
+          return;
+        }
+      }
+      localStorage.removeItem('mesero_session');
+      localStorage.removeItem('auth_token'); // Limpiar token JWT también
+      toast.success('Sesión cerrada');
+      navigate('/mesero-login', { replace: true });
+    } else {
+      navigate('/pos');
+    }
+  };
 
   const handleOpenPayment = () => {
     if (!currentTicket || currentTicket.items.length === 0) {
@@ -93,6 +168,18 @@ const POSVentasPage = () => {
     });
     setShowPaymentModal(false);
   };
+
+  // Mostrar loading mientras se verifica el turno
+  if (!shiftChecked) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Verificando turno activo...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentShift) {
     return (
@@ -126,7 +213,8 @@ const POSVentasPage = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate('/pos')}
+              onClick={handleLogout}
+              title={meseroSession ? "Cerrar sesión" : "Volver al POS"}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -154,8 +242,13 @@ const POSVentasPage = () => {
             <div className="hidden sm:flex items-center gap-2 text-sm">
               <User className="h-4 w-4 text-gray-500" />
               <span className="text-gray-600">
-                {vendedor?.nombre || user?.email || 'Sin vendedor'}
+                {currentUserName}
               </span>
+              {meseroSession && (
+                <Badge variant="outline" className="bg-orange-50 text-orange-700">
+                  Mesero
+                </Badge>
+              )}
             </div>
 
             {/* Botón nuevo ticket */}

@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from models.models import MiembroCreate, MiembroUpdate, MiembroResponse
 from utils import require_auth_user, require_admin
+from utils.auth import require_any_authenticated
 from core import config
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
+import uuid
 
 supabase = config.supabase
 api_router = APIRouter(prefix="")
@@ -55,6 +57,7 @@ async def create_miembro(miembro: MiembroCreate, current_user: Dict[str, Any] = 
         raise HTTPException(status_code=409, detail="Ya existe un miembro con este documento")
     
     data = miembro.model_dump()
+    data['uuid'] = str(uuid.uuid4())  # Generar UUID
     data['created_by'] = current_user['sub']
     data['updated_by'] = current_user['sub']
     
@@ -90,3 +93,114 @@ async def delete_miembro(miembro_uuid: str, current_user: Dict[str, Any] = Depen
     if not result.data:
         raise HTTPException(status_code=404, detail="Miembro no encontrado")
     return {"message": "Miembro eliminado"}
+
+
+# ============= CLIENTES TEMPORALES =============
+
+@api_router.post("/miembros/temporal", response_model=MiembroResponse)
+async def create_temporal_miembro(
+    miembro: MiembroCreate, 
+    current_user: Dict[str, Any] = Depends(require_any_authenticated)
+):
+    """Crear cliente temporal - Solo meseros y admin
+    
+    Los clientes temporales se crean con es_temporal=true y verificado=false
+    Un administrador debe verificarlos posteriormente
+    """
+    # Verificar que no exista el documento
+    existing = supabase.table('miembros').select('uuid').eq('documento', miembro.documento).eq('is_deleted', False).execute()
+    if existing.data:
+        raise HTTPException(status_code=409, detail="Ya existe un cliente con este documento")
+    
+    data = miembro.model_dump()
+    data['uuid'] = str(uuid.uuid4())  # Generar UUID
+    data['es_temporal'] = True
+    data['verificado'] = False
+    data['created_by'] = current_user.get('sub')
+    data['updated_by'] = current_user.get('sub')
+    
+    result = supabase.table('miembros').insert(data).execute()
+    return result.data[0]
+
+
+@api_router.get("/miembros/temporales/pendientes")
+async def get_temporales_pendientes(
+    current_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Listar clientes temporales pendientes de verificación"""
+    result = supabase.table('miembros')\
+        .select('*')\
+        .eq('es_temporal', True)\
+        .eq('verificado', False)\
+        .eq('is_deleted', False)\
+        .order('created_at', desc=True)\
+        .execute()
+    
+    return {
+        "miembros_pendientes": result.data or [],
+        "total": len(result.data) if result.data else 0
+    }
+
+
+@api_router.post("/miembros/{miembro_uuid}/verificar")
+async def verificar_miembro_temporal(
+    miembro_uuid: str,
+    current_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Verificar un cliente temporal - Solo admin"""
+    # Verificar que existe y es temporal
+    miembro = supabase.table('miembros')\
+        .select('*')\
+        .eq('uuid', miembro_uuid)\
+        .eq('es_temporal', True)\
+        .execute()
+    
+    if not miembro.data:
+        raise HTTPException(status_code=404, detail="Cliente temporal no encontrado")
+    
+    # Marcar como verificado
+    result = supabase.table('miembros')\
+        .update({
+            'verificado': True,
+            'updated_by': current_user.get('sub'),
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        })\
+        .eq('uuid', miembro_uuid)\
+        .execute()
+    
+    return {
+        "message": "Cliente verificado exitosamente",
+        "miembro": result.data[0]
+    }
+
+
+@api_router.delete("/miembros/{miembro_uuid}/rechazar")
+async def rechazar_miembro_temporal(
+    miembro_uuid: str,
+    motivo: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Rechazar y eliminar un cliente temporal - Solo admin"""
+    # Verificar que existe y es temporal
+    miembro = supabase.table('miembros')\
+        .select('*')\
+        .eq('uuid', miembro_uuid)\
+        .eq('es_temporal', True)\
+        .execute()
+    
+    if not miembro.data:
+        raise HTTPException(status_code=404, detail="Cliente temporal no encontrado")
+    
+    # Eliminar (soft delete)
+    result = supabase.table('miembros')\
+        .update({
+            'is_deleted': True,
+            'deleted_at': datetime.now(timezone.utc).isoformat(),
+            'notas': f"Rechazado: {motivo}" if motivo else "Rechazado por administrador"
+        })\
+        .eq('uuid', miembro_uuid)\
+        .execute()
+    
+    return {
+        "message": "Cliente temporal rechazado y eliminado"
+    }

@@ -99,6 +99,43 @@ const Admin = () => {
         <p className="mt-2 text-gray-600">Gestiona usuarios e invitaciones del sistema</p>
       </div>
 
+      {/* Enlaces rápidos */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card 
+          className="border-yellow-200 bg-yellow-50 hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => navigate('/clientes-temporales')}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-yellow-900">Clientes Temporales</h3>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Verifica clientes registrados por meseros
+                </p>
+              </div>
+              <Users className="h-8 w-8 text-yellow-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="border-blue-200 bg-blue-50 hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => navigate('/pos/turnos')}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-blue-900">Gestión de Turnos</h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  Administra turnos de caja del restaurante
+                </p>
+              </div>
+              <Shield className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card className="border-none shadow-md">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

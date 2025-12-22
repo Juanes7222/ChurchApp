@@ -32,8 +32,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             raise HTTPException(status_code=401, detail="Invalid token")
         return payload
     except jwt.ExpiredSignatureError:
+        print("❌ Token expired")
         raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.PyJWTError:
+    except jwt.PyJWTError as e:
+        print(f"❌ JWT Error: {e}")
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 # Guards tradicionales (mantener compatibilidad)
@@ -45,6 +47,10 @@ async def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)
 async def require_auth_user(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     if current_user.get("role") not in ["admin", "pastor", "secretaria", "ti"]:
         raise HTTPException(status_code=403, detail="Authorized user required")
+    return current_user
+
+async def require_any_authenticated(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Guard que permite cualquier usuario autenticado (incluyendo meseros)"""
     return current_user
 
 # Nuevos guards basados en permisos

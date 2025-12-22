@@ -97,6 +97,16 @@ const Login = () => {
             </Button>
           </div>
 
+          <div className="pt-4">
+            <Button
+              onClick={() => navigate('/mesero-login')}
+              variant="outline"
+              className="w-full h-11 text-base font-medium border-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300"
+            >
+              Soy Mesero
+            </Button>
+          </div>
+
           <div className="text-center text-sm text-gray-600 pt-4 border-t">
             <p>¿No tienes acceso?</p>
             <p className="mt-1">Contacta al administrador para obtener una invitación</p>

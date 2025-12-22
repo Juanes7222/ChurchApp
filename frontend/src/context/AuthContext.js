@@ -28,17 +28,26 @@ export const AuthProvider = ({ children }) => {
         try {
           const idToken = await firebaseUser.getIdToken();
           
-          // Verify token with backend and get our app user data
-          const response = await api.post('/auth/google', {
-            token: idToken,
-          });
+          // Check if we already have a valid token in localStorage
+          const existingToken = localStorage.getItem('auth_token');
+          const existingUser = localStorage.getItem('user');
           
-          const { access_token, user: userData } = response.data;
-          
-          // Store token and user data
-          localStorage.setItem('auth_token', access_token);
-          localStorage.setItem('user', JSON.stringify(userData));
-          setUser(userData);
+          if (existingToken && existingUser) {
+            // Token exists, just load user data
+            setUser(JSON.parse(existingUser));
+          } else {
+            // No token or user data, verify with backend
+            const response = await api.post('/auth/google', {
+              token: idToken,
+            });
+            
+            const { access_token, user: userData } = response.data;
+            
+            // Store token and user data
+            localStorage.setItem('auth_token', access_token);
+            localStorage.setItem('user', JSON.stringify(userData));
+            setUser(userData);
+          }
         } catch (error) {
           console.error('Error verifying Firebase token with backend:', error);
           // If backend verification fails, sign out from Firebase

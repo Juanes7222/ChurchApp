@@ -39,9 +39,37 @@ const usePOSStore = create(
 
       // ============= ACTIONS =============
       
+      // Cargar turno activo del servidor
+      loadActiveShift: async () => {
+        try {
+          const api = (await import('../lib/api')).default;
+          const response = await api.get('/pos/caja-shifts/activo');
+          console.log(response);
+          console.log('loadActiveShift response:', response.data);
+          if (response.data && response.data.shift) {
+            console.log('Setting currentShift:', response.data.shift);
+            set({ currentShift: response.data.shift });
+            return response.data.shift;
+          } else {
+            console.log('No active shift found');
+            set({ currentShift: null });
+            return null;
+          }
+        } catch (error) {
+          console.error('Error loading active shift:', error);
+          set({ currentShift: null });
+          return null;
+        }
+      },
+      
       // Inicializar shift y vendedor
       initializeShift: (shift, vendedor) => {
         set({ currentShift: shift, vendedor });
+      },
+      
+      // Limpiar shift y vendedor
+      clearShift: () => {
+        set({ currentShift: null, vendedor: null, currentTicket: null });
       },
 
       // Crear nuevo ticket
@@ -67,6 +95,12 @@ const usePOSStore = create(
 
       // Agregar producto al ticket
       addItem: (producto, cantidad = 1) => {
+        // Validar que el producto tenga UUID
+        if (!producto.uuid) {
+          console.error('Producto sin UUID:', producto);
+          throw new Error(`Producto "${producto.nombre}" no tiene UUID. Contacte al administrador.`);
+        }
+
         const ticket = get().currentTicket;
         if (!ticket) {
           get().newTicket();

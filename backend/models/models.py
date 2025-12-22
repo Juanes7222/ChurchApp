@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
 from decimal import Decimal
-from uuid import UUID
+# UUID removido - ahora usamos str para todos los identificadores
 
 class GoogleAuthRequest(BaseModel):
     token: str
@@ -42,6 +42,8 @@ class MiembroCreate(BaseModel):
     otra_iglesia: bool = False
     notas: Optional[str] = None
     public_profile: bool = False
+    es_temporal: Optional[bool] = False
+    verificado: Optional[bool] = True
 
 class MiembroUpdate(BaseModel):
     documento: Optional[str] = None
@@ -111,12 +113,12 @@ class ProductoCreate(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
     precio: Decimal
-    categoria_uuid: Optional[UUID] = None
+    categoria_uuid: Optional[str] = None
     favorito: Optional[bool] = False
     activo: Optional[bool] = True
 
 class ProductoResponse(ProductoCreate):
-    uuid: UUID
+    uuid: str
 
 class CategoriaProducto(BaseModel):
     nombre: str
@@ -125,7 +127,7 @@ class CategoriaProducto(BaseModel):
 
 # --- Venta Models ---
 class VentaItem(BaseModel):
-    producto_uuid: UUID
+    producto_uuid: str
     cantidad: Decimal
     precio_unitario: Decimal
     descuento: Optional[Decimal] = 0
@@ -139,51 +141,67 @@ class PagoVenta(BaseModel):
 
 class Venta(BaseModel):
     client_ticket_id: Optional[str] = None
-    shift_uuid: UUID
-    vendedor_uuid: UUID
+    shift_uuid: str
+    vendedor_uuid: Optional[str] = None  # Opcional, el backend lo determina del token
     tipo: str
-    miembro_uuid: Optional[UUID] = None
+    miembro_uuid: Optional[str] = None
     is_fiado: Optional[bool] = False
     items: List[VentaItem]
     pagos: List[PagoVenta]
 
 # --- Shift Models ---
+class MeseroPin(BaseModel):
+    pin: str  # PIN de 4 dígitos para el mesero
+
 class CajaShiftCreate(BaseModel):
-    apertura_por: UUID
+    apertura_por: str  # Firebase UID (not a standard UUID)
     efectivo_inicial: Decimal
+    meseros: Optional[List[MeseroPin]] = []  # Lista de PINs para crear meseros
 
 class CajaShiftResponse(CajaShiftCreate):
-    uuid: UUID
+    uuid: str
     estado: str
     apertura_fecha: datetime
+
+class CajaShiftClose(BaseModel):
+    efectivo_recuento: Decimal
+    notas: Optional[str] = None
 
 # --- UsuarioTemporal Models ---
 class UsuarioTemporalCreate(BaseModel):
     username: str
     display_name: str
     pin: str
-    fin_validity: datetime
+    fin_validity: Optional[datetime] = None
+    creado_por_uuid: str
+
+class UsuarioTemporalLogin(BaseModel):
+    username: str
+    pin: str
 
 class UsuarioTemporalResponse(BaseModel):
-    uuid: UUID
+    uuid: str
     username: str
     display_name: str
+    activo: bool
+    inicio_validity: datetime
+    fin_validity: Optional[datetime]
     fin_validity: datetime
     activo: bool
 
 # --- Other Models ---
 class Inventario(BaseModel):
-    producto_uuid: UUID
+    producto_uuid: str
     cantidad_actual: Decimal
     ubicacion: Optional[str] = None
 
 class CuentaMiembro(BaseModel):
-    miembro_uuid: UUID
+    miembro_uuid: str
     limite_credito: Optional[Decimal] = 0
 
 class MovimientoCuenta(BaseModel):
-    cuenta_uuid: UUID
-    venta_uuid: Optional[UUID] = None
+    cuenta_uuid: str
+    venta_uuid: Optional[str] = None
     tipo: str
     monto: Decimal
     descripcion: Optional[str] = None

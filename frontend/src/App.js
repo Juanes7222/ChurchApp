@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from './components/ui/sonner';
 import { ProtectedRoute } from './components/PermissionGuard';
@@ -14,7 +15,25 @@ import Grupos from './pages/Grupos';
 import Admin from './pages/Admin';
 import POS from './pages/POS';
 import POSVentasPage from './pages/POSVentasPage';
+import RequireActiveShift from './components/RequireActiveShift';
+import POSProductos from './pages/POSProductos';
+import POSTurnos from './pages/POSTurnos';
+import POSCuentas from './pages/POSCuentas';
+import POSReportes from './pages/POSReportes';
+import POSInventario from './pages/POSInventario';
+import MeseroLogin from './pages/MeseroLogin';
+import ClientesTemporales from './pages/ClientesTemporales';
 import './App.css';
+
+// React Query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutos
+      retry: 1,
+    },
+  },
+});
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -76,8 +95,9 @@ const PrivateRoute = ({ children }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
           
@@ -155,6 +175,16 @@ function App() {
               } 
             />
             
+            {/* Clientes Temporales - Solo admin */}
+            <Route 
+              path="clientes-temporales" 
+              element={
+                <ProtectedRoute section="admin" redirectTo="/dashboard">
+                  <ClientesTemporales />
+                </ProtectedRoute>
+              } 
+            />
+            
             {/* POS - Solo agente_restaurante, ayudante_restaurante, admin */}
             <Route 
               path="pos" 
@@ -169,17 +199,75 @@ function App() {
               path="pos/ventas" 
               element={
                 <ProtectedRoute permission={PERMISSIONS.CREATE_SALES} redirectTo="/pos">
-                  <POSVentasPage />
+                  <RequireActiveShift>
+                    <POSVentasPage />
+                  </RequireActiveShift>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="pos/productos" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.VIEW_POS} redirectTo="/pos">
+                  <POSProductos />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="pos/turnos" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.OPEN_SHIFT} redirectTo="/pos">
+                  <POSTurnos />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="pos/cuentas" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.VIEW_MEMBER_ACCOUNTS} redirectTo="/pos">
+                  <POSCuentas />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="pos/reportes" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.VIEW_SALES_REPORTS} redirectTo="/pos">
+                  <POSReportes />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="pos/inventario" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.VIEW_INVENTORY} redirectTo="/pos">
+                  <POSInventario />
                 </ProtectedRoute>
               } 
             />
           </Route>
+          
+          {/* Login de Meseros - Público */}
+          <Route path="/mesero-login" element={<MeseroLogin />} />
+          
+          {/* Ventas para Meseros - Sin autenticación Firebase */}
+          <Route path="/mesero/ventas" element={
+            <RequireActiveShift>
+              <POSVentasPage />
+            </RequireActiveShift>
+          } />
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" richColors />
     </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

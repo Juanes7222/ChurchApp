@@ -1,11 +1,18 @@
-/**
- * API Service - Comunicación con backend
- * Incluye manejo de errores, retry logic y modo offline
- */
-
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000/api';
+const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+const TOKEN_KEY = 'auth_token'; // Cambiado de 'pos_token' a 'auth_token' para consistencia
+const SHIFT_KEY = 'current_shift';
+const VENDEDOR_KEY = 'vendedor_info';
+
+// Endpoints base
+const ENDPOINTS = {
+  AUTH: '/api/pos/pos',
+  POS: '/api/pos',
+  MIEMBROS: '/api/miembros',
+  SYNC: '/api/pos/sync',
+  REPORTES: '/api/pos/reportes',
+};
 
 // Configuración de axios
 const api = axios.create({
@@ -16,10 +23,21 @@ const api = axios.create({
   },
 });
 
+// Utilidades para manejo de tokens
+const tokenManager = {
+  get: () => localStorage.getItem(TOKEN_KEY),
+  set: (token) => localStorage.setItem(TOKEN_KEY, token),
+  remove: () => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(SHIFT_KEY);
+    localStorage.removeItem(VENDEDOR_KEY);
+  },
+};
+
 // Interceptor para agregar token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('pos_token');
+    const token = tokenManager.get();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -33,8 +51,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expirado o inválido
-      localStorage.removeItem('pos_token');
+      tokenManager.remove();
       window.location.href = '/pos/login';
     }
     return Promise.reject(error);
@@ -43,123 +60,157 @@ api.interceptors.response.use(
 
 // ============= AUTH =============
 
-export const loginTempUser = async (username, pin, shiftUuid) => {
-  const response = await api.post('/pos/pos/login-temp', null, {
-    params: { username, pin, shift_uuid: shiftUuid }
-  });
-  
-  if (response.data.access_token) {
-    localStorage.setItem('pos_token', response.data.access_token);
-  }
-  
-  return response.data;
-};
+export const authService = {
+  loginTempUser: async (username, pin, shiftUuid) => {
+    const response = await api.post(`${ENDPOINTS.AUTH}/login-temp`, null, {
+      params: { username, pin, shift_uuid: shiftUuid }
+    });
+    
+    if (response.data.access_token) {
+      tokenManager.set(response.data.access_token);
+    }
+    
+    return response.data;
+  },
 
-export const logout = () => {
-  localStorage.removeItem('pos_token');
-  localStorage.removeItem('current_shift');
-  localStorage.removeItem('vendedor_info');
+  logout: () => {
+    tokenManager.remove();
+  },
 };
 
 // ============= PRODUCTOS =============
 
-export const fetchProductos = async (params = {}) => {
-  const response = await api.get('/pos/productos', { params });
-  return response.data.productos || response.data;
-};
+export const productosService = {
+  getAll: async (params = {}) => {
+    const response = await api.get(`${ENDPOINTS.POS}/productos`, { params });
+    return response.data.productos || response.data;
+  },
 
-export const fetchCategorias = async () => {
-  const response = await api.get('/pos/categorias');
-  return response.data.categorias || response.data;
+  getCategorias: async () => {
+    const response = await api.get(`${ENDPOINTS.POS}/categorias`);
+    return response.data.categorias || response.data;
+  },
 };
 
 // ============= VENTAS =============
 
-export const createVenta = async (ventaData) => {
-  const response = await api.post('/pos/ventas', ventaData);
-  return response.data;
-};
+export const ventasService = {
+  create: async (ventaData) => {
+    const response = await api.post(`${ENDPOINTS.POS}/ventas`, ventaData);
+    return response.data;
+  },
 
-export const fetchVentas = async (params = {}) => {
-  const response = await api.get('/pos/ventas', { params });
-  return response.data;
-};
+  getAll: async (params = {}) => {
+    const response = await api.get(`${ENDPOINTS.POS}/ventas`, { params });
+    return response.data;
+  },
 
-export const getVentaDetail = async (ventaUuid) => {
-  const response = await api.get(`/pos/ventas/${ventaUuid}`);
-  return response.data;
-};
+  getById: async (ventaUuid) => {
+    const response = await api.get(`${ENDPOINTS.POS}/ventas/${ventaUuid}`);
+    return response.data;
+  },
 
-export const anularVenta = async (ventaUuid, motivo) => {
-  const response = await api.post(`/pos/ventas/${ventaUuid}/anular`, null, {
-    params: { motivo }
-  });
-  return response.data;
+  anular: async (ventaUuid, motivo) => {
+    const response = await api.post(`${ENDPOINTS.POS}/ventas/${ventaUuid}/anular`, null, {
+      params: { motivo }
+    });
+    return response.data;
+  },
 };
 
 // ============= SHIFTS =============
 
-export const fetchShifts = async (params = {}) => {
-  const response = await api.get('/pos/caja-shifts', { params });
-  return response.data.shifts || response.data;
-};
+export const shiftsService = {
+  getAll: async (params = {}) => {
+    const response = await api.get(`${ENDPOINTS.POS}/caja-shifts`, { params });
+    return response.data.shifts || response.data;
+  },
 
-export const getShiftSummary = async (shiftUuid) => {
-  const response = await api.get(`/pos/caja-shifts/${shiftUuid}/summary`);
-  return response.data;
-};
+  getSummary: async (shiftUuid) => {
+    const response = await api.get(`${ENDPOINTS.POS}/caja-shifts/${shiftUuid}/summary`);
+    return response.data;
+  },
 
-export const closeShift = async (shiftUuid, efectivoRecuento, notas = null) => {
-  const response = await api.post(`/pos/caja-shifts/${shiftUuid}/cerrar`, null, {
-    params: { efectivo_recuento: efectivoRecuento, notas }
-  });
-  return response.data;
+  close: async (shiftUuid, efectivoRecuento, notas = null) => {
+    const response = await api.post(`${ENDPOINTS.POS}/caja-shifts/${shiftUuid}/cerrar`, null, {
+      params: { efectivo_recuento: efectivoRecuento, notas }
+    });
+    return response.data;
+  },
 };
 
 // ============= MIEMBROS (para fiado) =============
 
-export const searchMiembros = async (query) => {
-  const response = await api.get('/miembros', {
-    params: { q: query, page_size: 10 }
-  });
-  return response.data.miembros || [];
-};
+export const miembrosService = {
+  search: async (query) => {
+    const response = await api.get(ENDPOINTS.MIEMBROS, {
+      params: { q: query, page_size: 10 }
+    });
+    return response.data.miembros || [];
+  },
 
-export const getMiembroCuenta = async (miembroUuid) => {
-  const response = await api.get(`/pos/reportes/cuentas-pendientes`);
-  const cuentas = response.data.cuentas || [];
-  return cuentas.find(c => c.miembro_uuid === miembroUuid);
+  getCuenta: async (miembroUuid) => {
+    const response = await api.get(`${ENDPOINTS.REPORTES}/cuentas-pendientes`);
+    const cuentas = response.data.cuentas || [];
+    return cuentas.find(c => c.miembro_uuid === miembroUuid);
+  },
 };
 
 // ============= SINCRONIZACIÓN =============
 
-export const syncPushVentas = async (ventas) => {
-  const response = await api.post('/pos/sync/push', { ventas });
-  return response.data;
-};
+export const syncService = {
+  pushVentas: async (ventas) => {
+    const response = await api.post(`${ENDPOINTS.SYNC}/push`, { ventas });
+    return response.data;
+  },
 
-export const getSyncPending = async () => {
-  const response = await api.get('/pos/sync/pending');
-  return response.data;
+  getPending: async () => {
+    const response = await api.get(`${ENDPOINTS.SYNC}/pending`);
+    return response.data;
+  },
 };
 
 // ============= INVENTARIO =============
 
-export const fetchInventario = async (params = {}) => {
-  const response = await api.get('/pos/inventario', { params });
-  return response.data.inventario || response.data;
+export const inventarioService = {
+  getAll: async (params = {}) => {
+    const response = await api.get(`${ENDPOINTS.POS}/inventario`, { params });
+    return response.data.inventario || response.data;
+  },
 };
 
 // ============= REPORTES =============
 
-export const getReporteVentas = async (params = {}) => {
-  const response = await api.get('/pos/reportes/ventas', { params });
-  return response.data;
+export const reportesService = {
+  getVentas: async (params = {}) => {
+    const response = await api.get(`${ENDPOINTS.REPORTES}/ventas`, { params });
+    return response.data;
+  },
+
+  getCuentasPendientes: async (params = {}) => {
+    const response = await api.get(`${ENDPOINTS.REPORTES}/cuentas-pendientes`, { params });
+    return response.data;
+  },
 };
 
-export const getReporteCuentasPendientes = async (params = {}) => {
-  const response = await api.get('/pos/reportes/cuentas-pendientes', { params });
-  return response.data;
-};
+// Exportaciones legacy para compatibilidad (puedes eliminarlas después de actualizar imports)
+export const loginTempUser = authService.loginTempUser;
+export const logout = authService.logout;
+export const fetchProductos = productosService.getAll;
+export const fetchCategorias = productosService.getCategorias;
+export const createVenta = ventasService.create;
+export const fetchVentas = ventasService.getAll;
+export const getVentaDetail = ventasService.getById;
+export const anularVenta = ventasService.anular;
+export const fetchShifts = shiftsService.getAll;
+export const getShiftSummary = shiftsService.getSummary;
+export const closeShift = shiftsService.close;
+export const searchMiembros = miembrosService.search;
+export const getMiembroCuenta = miembrosService.getCuenta;
+export const syncPushVentas = syncService.pushVentas;
+export const getSyncPending = syncService.getPending;
+export const fetchInventario = inventarioService.getAll;
+export const getReporteVentas = reportesService.getVentas;
+export const getReporteCuentasPendientes = reportesService.getCuentasPendientes;
 
 export default api;

@@ -1335,26 +1335,26 @@ async def get_reporte_productos(
 ) -> Dict[str, Any]:
     """RF-REPORT-03: Reporte de productos más vendidos"""
     try:
-        # Obtener detalles de ventas
-        query = supabase.table('venta_detalle').select(
+        # Obtener items de ventas
+        query = supabase.table('venta_items').select(
             '*, productos(nombre, codigo, categoria_uuid)'
         )
         
         result = query.execute()
-        detalles = result.data or []
+        items = result.data or []
         
         # Agrupar por producto
         productos_vendidos = {}
-        for d in detalles:
-            prod_uuid = d.get('producto_uuid')
+        for item in items:
+            prod_uuid = item.get('producto_uuid')
             if prod_uuid not in productos_vendidos:
                 productos_vendidos[prod_uuid] = {
-                    'producto': d.get('productos', {}),
+                    'producto': item.get('productos', {}),
                     'cantidad_total': 0,
                     'ingresos_total': 0
                 }
-            productos_vendidos[prod_uuid]['cantidad_total'] += d.get('cantidad', 0)
-            productos_vendidos[prod_uuid]['ingresos_total'] += float(d.get('subtotal', 0))
+            productos_vendidos[prod_uuid]['cantidad_total'] += float(item.get('cantidad', 0))
+            productos_vendidos[prod_uuid]['ingresos_total'] += float(item.get('total_item', 0))
         
         # Ordenar por cantidad vendida
         productos_list = sorted(
@@ -1370,6 +1370,65 @@ async def get_reporte_productos(
     except Exception as e:
         logger.error(f"Error getting reporte productos: {e}")
         raise HTTPException(status_code=500, detail="Error al obtener reporte")
+
+@pos_router.get("/reportes/deudas")
+async def get_reporte_deudas(
+    current_user: Dict[str, Any] = Depends(require_auth_user)
+) -> Dict[str, Any]:
+    """RF-REP-03: Obtener reporte de deudas totales de miembros"""
+    try:
+        # Obtener todas las cuentas con saldo deudor
+        result = supabase.table('cuentas_miembro').select(
+            '*, miembros(nombres, apellidos, documento)'
+        ).gt('saldo_deudor', 0).execute()
+        
+        cuentas = result.data or []
+        
+        # Calcular estadísticas
+        deuda_total = sum(float(cuenta.get('saldo_deudor', 0)) for cuenta in cuentas)
+        miembros_con_deuda = len(cuentas)
+        deuda_promedio = deuda_total / miembros_con_deuda if miembros_con_deuda > 0 else 0
+        
+        # Ordenar por saldo descendente
+        cuentas_ordenadas = sorted(
+            cuentas, 
+            key=lambda c: float(c.get('saldo_deudor', 0)), 
+            reverse=True
+        )
+        
+        # Top 10 mayores deudas
+        top_deudas = []
+        for cuenta in cuentas_ordenadas[:10]:
+            miembro = cuenta.get('miembros', {})
+            top_deudas.append({
+                'cuenta_uuid': cuenta.get('uuid'),
+                'miembro_uuid': cuenta.get('miembro_uuid'),
+                'miembro_nombre': f"{miembro.get('nombres', '')} {miembro.get('apellidos', '')}".strip(),
+                'miembro_documento': miembro.get('documento'),
+                'saldo_deudor': float(cuenta.get('saldo_deudor', 0))
+            })
+        
+        return {
+            "resumen": {
+                "deuda_total": deuda_total,
+                "miembros_con_deuda": miembros_con_deuda,
+                "deuda_promedio": deuda_promedio
+            },
+            "top_deudas": top_deudas,
+            "todas_cuentas": [
+                {
+                    'cuenta_uuid': c.get('uuid'),
+                    'miembro_uuid': c.get('miembro_uuid'),
+                    'miembro_nombre': f"{c.get('miembros', {}).get('nombres', '')} {c.get('miembros', {}).get('apellidos', '')}".strip(),
+                    'miembro_documento': c.get('miembros', {}).get('documento'),
+                    'saldo_deudor': float(c.get('saldo_deudor', 0))
+                }
+                for c in cuentas_ordenadas
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error getting reporte deudas: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener reporte de deudas")
 
 # ============= INVENTARIO (RF-INV) =============
 

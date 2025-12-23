@@ -30,7 +30,9 @@ import {
   Calendar,
   Download,
   RefreshCcw,
-  BarChart3
+  BarChart3,
+  CreditCard,
+  Users
 } from 'lucide-react';
 
 // API functions
@@ -47,6 +49,11 @@ const fetchReporteProductos = async (fechaDesde, fechaHasta) => {
   if (fechaDesde) params.append('fecha_desde', fechaDesde);
   if (fechaHasta) params.append('fecha_hasta', fechaHasta);
   const { data } = await api.get(`/pos/reportes/productos?${params.toString()}`);
+  return data;
+};
+
+const fetchReporteDeudas = async () => {
+  const { data } = await api.get('/pos/reportes/deudas');
   return data;
 };
 
@@ -81,9 +88,20 @@ const POSReportes = () => {
     queryFn: () => fetchReporteProductos(fechaDesde, fechaHasta),
   });
 
+  // Query para reporte de deudas
+  const { 
+    data: reporteDeudas, 
+    isLoading: loadingDeudas,
+    refetch: refetchDeudas 
+  } = useQuery({
+    queryKey: ['reporte-deudas'],
+    queryFn: () => fetchReporteDeudas(),
+  });
+
   const handleRefresh = () => {
     refetchVentas();
     refetchProductos();
+    refetchDeudas();
   };
 
   const formatCurrency = (value) => {
@@ -188,7 +206,7 @@ const POSReportes = () => {
 
       {/* Tabs de reportes */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="ventas" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
             Reporte de Ventas
@@ -196,6 +214,10 @@ const POSReportes = () => {
           <TabsTrigger value="productos" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Productos más Vendidos
+          </TabsTrigger>
+          <TabsTrigger value="deudas" className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            Cuentas por Cobrar
           </TabsTrigger>
         </TabsList>
 
@@ -425,6 +447,147 @@ const POSReportes = () => {
                             </TableCell>
                             <TableCell className="text-right font-bold text-green-600">
                               {formatCurrency(item.ingresos_total)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+
+        {/* Tab de Deudas */}
+        <TabsContent value="deudas" className="space-y-6">
+          {loadingDeudas ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+            </div>
+          ) : reporteDeudas && (
+            <>
+              {/* Resumen de deudas */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="h-8 w-8 text-red-600" />
+                      <div>
+                        <p className="text-2xl font-bold text-red-600">
+                          {formatCurrency(reporteDeudas.resumen?.deuda_total || 0)}
+                        </p>
+                        <p className="text-sm text-gray-600">Deuda Total</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <Users className="h-8 w-8 text-orange-600" />
+                      <div>
+                        <p className="text-2xl font-bold">
+                          {reporteDeudas.resumen?.miembros_con_deuda || 0}
+                        </p>
+                        <p className="text-sm text-gray-600">Miembros con Deuda</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <TrendingUp className="h-8 w-8 text-purple-600" />
+                      <div>
+                        <p className="text-2xl font-bold">
+                          {formatCurrency(reporteDeudas.resumen?.deuda_promedio || 0)}
+                        </p>
+                        <p className="text-sm text-gray-600">Deuda Promedio</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Top 10 mayores deudas */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Top 10 Mayores Deudas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(reporteDeudas.top_deudas || []).length === 0 ? (
+                    <p className="text-gray-500 text-center py-4">No hay deudas registradas</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-10">#</TableHead>
+                          <TableHead>Miembro</TableHead>
+                          <TableHead>Documento</TableHead>
+                          <TableHead className="text-right">Saldo Deudor</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reporteDeudas.top_deudas.map((item, index) => (
+                          <TableRow key={item.cuenta_uuid}>
+                            <TableCell>
+                              <Badge variant={index < 3 ? 'destructive' : 'secondary'}>
+                                {index + 1}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {item.miembro_nombre || 'Miembro desconocido'}
+                            </TableCell>
+                            <TableCell className="text-gray-500">
+                              {item.miembro_documento || '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-red-600">
+                              {formatCurrency(item.saldo_deudor)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Todas las cuentas con deuda */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Todas las Cuentas con Deuda</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(reporteDeudas.todas_cuentas || []).length === 0 ? (
+                    <p className="text-gray-500 text-center py-4">No hay deudas registradas</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Miembro</TableHead>
+                          <TableHead>Documento</TableHead>
+                          <TableHead className="text-right">Saldo Deudor</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reporteDeudas.todas_cuentas.map((item) => (
+                          <TableRow 
+                            key={item.cuenta_uuid}
+                            className="cursor-pointer hover:bg-gray-50"
+                            onClick={() => navigate(`/pos/cuentas/${item.cuenta_uuid}`)}
+                          >
+                            <TableCell className="font-medium">
+                              {item.miembro_nombre || 'Miembro desconocido'}
+                            </TableCell>
+                            <TableCell className="text-gray-500">
+                              {item.miembro_documento || '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-red-600">
+                              {formatCurrency(item.saldo_deudor)}
                             </TableCell>
                           </TableRow>
                         ))}

@@ -79,9 +79,10 @@ BEGIN
   IF (p_payload->>'is_fiado')::boolean = true THEN
     SELECT uuid INTO v_cuenta_uuid FROM cuentas_miembro WHERE miembro_uuid = (p_payload->>'miembro_uuid')::text;
     IF NOT FOUND THEN
-      INSERT INTO cuentas_miembro (miembro_uuid, saldo_deudor, saldo_acumulado, limite_credito, created_at, updated_at)
-      VALUES ((p_payload->>'miembro_uuid')::text, v_total, v_total, 0, now(), now())
-      RETURNING uuid INTO v_cuenta_uuid;
+      -- Generar UUID para la nueva cuenta
+      v_cuenta_uuid := gen_random_uuid()::text;
+      INSERT INTO cuentas_miembro (uuid, miembro_uuid, saldo_deudor, saldo_acumulado, limite_credito, created_at, updated_at)
+      VALUES (v_cuenta_uuid, (p_payload->>'miembro_uuid')::text, v_total, v_total, 0, now(), now());
     ELSE
       UPDATE cuentas_miembro SET
         saldo_deudor = coalesce(saldo_deudor,0) + v_total,
@@ -90,8 +91,10 @@ BEGIN
       WHERE uuid = v_cuenta_uuid;
     END IF;
 
-    INSERT INTO movimientos_cuenta (cuenta_uuid, venta_uuid, tipo, monto, fecha, descripcion, created_by_uuid, created_at, updated_at)
-    VALUES (v_cuenta_uuid, v_v_uuid, 'cargo', v_total, now(), 'Cargo por venta fiada', p_actor_uuid, now(), now());
+    -- Generar UUID para el movimiento
+    v_mv_uuid := gen_random_uuid()::text;
+    INSERT INTO movimientos_cuenta (uuid, cuenta_uuid, venta_uuid, tipo, monto, fecha, descripcion, created_by_uuid, created_at, updated_at)
+    VALUES (v_mv_uuid, v_cuenta_uuid, v_v_uuid, 'cargo', v_total, now(), 'Cargo por venta fiada', p_actor_uuid, now(), now());
   END IF;
 
   UPDATE ventas SET pago_estado = CASE

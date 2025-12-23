@@ -903,7 +903,7 @@ async def list_cuentas_miembro(
     try:
         # Join con miembros para obtener nombre
         query = supabase.table('cuentas_miembro').select(
-            '*, miembros!inner(uuid, nombre, apellido, email, telefono)'
+            '*, miembros!inner(uuid, nombres, apellidos, email, telefono)'
         )
         
         if con_saldo:
@@ -917,8 +917,8 @@ async def list_cuentas_miembro(
             q_lower = q.lower()
             cuentas = [
                 c for c in cuentas
-                if q_lower in c.get('miembros', {}).get('nombre', '').lower() 
-                or q_lower in c.get('miembros', {}).get('apellido', '').lower()
+                if q_lower in c.get('miembros', {}).get('nombres', '').lower() 
+                or q_lower in c.get('miembros', {}).get('apellidos', '').lower()
             ]
         
         return {"cuentas": cuentas}
@@ -931,11 +931,11 @@ async def get_cuenta_miembro(
     miembro_uuid: str,
     current_user: Dict[str, Any] = Depends(require_auth_user)
 ) -> Dict[str, Any]:
-    """Obtener cuenta de un miembro específico"""
+    """Obtener cuenta de un miembro específico con resumen financiero"""
     try:
         # Obtener cuenta con info del miembro
         cuenta_result = supabase.table('cuentas_miembro').select(
-            '*, miembros!inner(uuid, nombre, apellido, email, telefono)'
+            '*, miembros!inner(uuid, nombres, apellidos, email, telefono)'
         ).eq('miembro_uuid', miembro_uuid).execute()
         
         if not cuenta_result.data:
@@ -943,27 +943,79 @@ async def get_cuenta_miembro(
         
         cuenta = cuenta_result.data[0]
         
-        # Obtener historial de ventas fiadas
+        # Obtener resumen de ventas fiadas
         ventas_result = supabase.table('ventas').select(
-            'uuid, total, created_at, is_fiado, estado'
-        ).eq('miembro_uuid', miembro_uuid).eq('is_fiado', True).eq('is_deleted', False).order('created_at', desc=True).limit(50).execute()
+            'uuid, total, created_at, is_fiado, estado, numero_ticket'
+        ).eq('miembro_uuid', miembro_uuid).eq('is_fiado', True).eq('is_deleted', False).order('created_at', desc=True).execute()
         
-        # Obtener historial de movimientos (incluye abonos)
-        movimientos_result = supabase.table('movimientos_cuenta').select('*').eq('cuenta_uuid', cuenta.get('uuid')).eq('is_deleted', False).order('fecha', desc=True).limit(50).execute()
+        ventas_fiadas = ventas_result.data or []
         
-        # Filtrar solo los pagos/abonos
-        abonos = [m for m in (movimientos_result.data or []) if m.get('tipo') == 'pago']
+        # Obtener movimientos recientes para mostrar
+        movimientos_result = supabase.table('movimientos_cuenta').select('*').eq('cuenta_uuid', cuenta.get('uuid')).eq('is_deleted', False).order('fecha', desc=True).limit(10).execute()
+        
+        # Obtener TODOS los movimientos para calcular estadísticas correctamente
+        todos_movimientos = supabase.table('movimientos_cuenta').select('tipo, monto').eq('cuenta_uuid', cuenta.get('uuid')).eq('is_deleted', False).execute()
+        
+        # Calcular estadísticas usando TODOS los movimientos
+        total_cargos = sum(float(m.get('monto', 0)) for m in (todos_movimientos.data or []) if m.get('tipo') == 'cargo')
+        total_pagos = sum(float(m.get('monto', 0)) for m in (todos_movimientos.data or []) if m.get('tipo') == 'pago')
         
         return {
             "cuenta": cuenta,
-            "ventas_fiadas": ventas_result.data or [],
-            "abonos": abonos
+            "ventas_fiadas": ventas_fiadas,
+            "movimientos_recientes": movimientos_result.data or [],
+            "estadisticas": {
+                "total_cargos": total_cargos,
+                "total_pagos": total_pagos,
+                "saldo_actual": float(cuenta.get('saldo_deudor', 0))
+            }
         }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error getting cuenta: {e}")
         raise HTTPException(status_code=500, detail="Error al obtener cuenta")
+
+@pos_router.get("/cuentas/{miembro_uuid}/movimientos")
+async def get_movimientos_cuenta(
+    miembro_uuid: str,
+    limit: int = 50,
+    offset: int = 0,
+    current_user: Dict[str, Any] = Depends(require_auth_user)
+) -> Dict[str, Any]:
+    """Obtener historial completo de movimientos de una cuenta con paginación"""
+    try:
+        # Verificar que existe la cuenta
+        cuenta_result = supabase.table('cuentas_miembro').select('uuid').eq('miembro_uuid', miembro_uuid).execute()
+        
+        if not cuenta_result.data or len(cuenta_result.data) == 0:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+        
+        cuenta_uuid = cuenta_result.data[0].get('uuid')
+        
+        if not cuenta_uuid:
+            raise HTTPException(status_code=404, detail="UUID de cuenta no disponible")
+        
+        # Obtener movimientos con paginación (sin join - haremos lookup manual si es necesario)
+        movimientos_result = supabase.table('movimientos_cuenta').select('*').eq('cuenta_uuid', cuenta_uuid).eq('is_deleted', False).order('fecha', desc=True).range(offset, offset + limit - 1).execute()
+        
+        # Contar total de movimientos
+        count_result = supabase.table('movimientos_cuenta').select('uuid', count='exact').eq('cuenta_uuid', cuenta_uuid).eq('is_deleted', False).execute()
+        
+        total_count = count_result.count if hasattr(count_result, 'count') else len(movimientos_result.data or [])
+        
+        return {
+            "movimientos": movimientos_result.data or [],
+            "total": total_count,
+            "limit": limit,
+            "offset": offset,
+            "has_more": (offset + limit) < total_count
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting movimientos: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener movimientos")
 
 @pos_router.post("/cuentas/{miembro_uuid}/abonos")
 async def registrar_abono(
@@ -993,7 +1045,9 @@ async def registrar_abono(
             raise HTTPException(status_code=400, detail=f"El abono excede el saldo deudor (${saldo_actual:.2f})")
         
         # Registrar movimiento de tipo 'pago'
+        movimiento_uuid = str(uuid.uuid4())
         movimiento_data = {
+            'uuid': movimiento_uuid,
             'cuenta_uuid': cuenta.get('uuid'),
             'tipo': 'pago',
             'monto': float(monto),
@@ -1024,6 +1078,104 @@ async def registrar_abono(
     except Exception as e:
         logger.error(f"Error registering abono: {e}")
         raise HTTPException(status_code=500, detail="Error al registrar abono")
+
+@pos_router.post("/cuentas/{miembro_uuid}/ajustes")
+async def crear_ajuste_cuenta(
+    miembro_uuid: str,
+    monto: Decimal,
+    justificacion: str,
+    current_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Crear ajuste administrativo en cuenta de miembro (positivo o negativo)"""
+    try:
+        if not justificacion or len(justificacion.strip()) < 10:
+            raise HTTPException(status_code=400, detail="Se requiere una justificación de al menos 10 caracteres")
+        
+        actor_uuid = current_user.get('sub') or current_user.get('uid')
+        
+        # Verificar que existe la cuenta
+        cuenta_result = supabase.table('cuentas_miembro').select('*').eq('miembro_uuid', miembro_uuid).execute()
+        
+        if not cuenta_result.data:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+        
+        cuenta = cuenta_result.data[0]
+        saldo_actual = float(cuenta.get('saldo_deudor', 0))
+        
+        # Crear movimiento de tipo 'ajuste'
+        movimiento_uuid = str(uuid.uuid4())
+        movimiento_data = {
+            'uuid': movimiento_uuid,
+            'cuenta_uuid': cuenta.get('uuid'),
+            'tipo': 'ajuste',
+            'monto': float(monto),
+            'descripcion': f"Ajuste administrativo: {justificacion}",
+            'created_by_uuid': actor_uuid,
+            'fecha': datetime.now(timezone.utc).isoformat()
+        }
+        
+        movimiento_result = supabase.table('movimientos_cuenta').insert(movimiento_data).execute()
+        
+        if not movimiento_result.data:
+            raise HTTPException(status_code=500, detail="Error al crear ajuste")
+        
+        # Actualizar saldo (monto positivo = incrementa deuda, negativo = reduce deuda)
+        nuevo_saldo = saldo_actual + float(monto)
+        
+        supabase.table('cuentas_miembro').update({
+            'saldo_deudor': nuevo_saldo,
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        }).eq('miembro_uuid', miembro_uuid).execute()
+        
+        return {
+            "ajuste": movimiento_result.data[0],
+            "saldo_anterior": saldo_actual,
+            "nuevo_saldo": nuevo_saldo,
+            "monto": float(monto)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating ajuste: {e}")
+        raise HTTPException(status_code=500, detail="Error al crear ajuste")
+
+@pos_router.get("/ventas/{venta_uuid}/detalle")
+async def get_venta_detalle(
+    venta_uuid: str,
+    current_user: Dict[str, Any] = Depends(require_auth_user)
+) -> Dict[str, Any]:
+    """Obtener detalle completo de una venta incluyendo items y productos"""
+    try:
+        # Obtener venta con datos del vendedor
+        venta_result = supabase.table('ventas').select(
+            '*, miembros!ventas_miembro_uuid_fkey(nombres, apellidos)'
+        ).eq('uuid', venta_uuid).execute()
+        
+        if not venta_result.data:
+            raise HTTPException(status_code=404, detail="Venta no encontrada")
+        
+        venta = venta_result.data[0]
+        
+        # Obtener items de la venta con info de productos
+        items_result = supabase.table('venta_items').select(
+            '*, productos(nombre, precio, categoria_uuid, categorias_producto(nombre))'
+        ).eq('venta_uuid', venta_uuid).eq('is_deleted', False).execute()
+        
+        # Obtener pagos asociados
+        pagos_result = supabase.table('pagos_venta').select('*').eq('venta_uuid', venta_uuid).execute()
+        
+        return {
+            "venta": venta,
+            "items": items_result.data or [],
+            "pagos": pagos_result.data or [],
+            "subtotal": float(venta.get('subtotal', 0)),
+            "total": float(venta.get('total', 0))
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting venta detalle: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener detalle de venta")
 
 # ============= REPORTES (RF-REPORT) =============
 

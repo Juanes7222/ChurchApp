@@ -19,6 +19,7 @@ import RequireActiveShift from './components/RequireActiveShift';
 import POSProductos from './pages/POSProductos';
 import POSTurnos from './pages/POSTurnos';
 import POSCuentas from './pages/POSCuentas';
+import CuentaDetailPage from './pages/CuentaDetailPage';
 import POSReportes from './pages/POSReportes';
 import POSInventario from './pages/POSInventario';
 import MeseroLogin from './pages/MeseroLogin';
@@ -229,6 +230,15 @@ function App() {
               element={
                 <ProtectedRoute permission={PERMISSIONS.VIEW_MEMBER_ACCOUNTS} redirectTo="/pos">
                   <POSCuentas />
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="pos/cuentas/:miembroUuid" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.VIEW_MEMBER_ACCOUNTS} redirectTo="/pos">
+                  <CuentaDetailPage />
                 </ProtectedRoute>
               } 
             />

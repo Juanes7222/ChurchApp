@@ -41,8 +41,7 @@ import {
   Eye, 
   CreditCard,
   AlertCircle,
-  CheckCircle,
-  History
+  CheckCircle
 } from 'lucide-react';
 
 // API functions
@@ -75,7 +74,6 @@ const POSCuentas = () => {
   const [search, setSearch] = useState('');
   const [soloConSaldo, setSoloConSaldo] = useState(false);
   const [selectedCuenta, setSelectedCuenta] = useState(null);
-  const [showDetalleModal, setShowDetalleModal] = useState(false);
   const [showAbonoModal, setShowAbonoModal] = useState(false);
   const [abonoForm, setAbonoForm] = useState({
     monto: '',
@@ -87,13 +85,6 @@ const POSCuentas = () => {
   const { data: cuentas = [], isLoading, refetch } = useQuery({
     queryKey: ['cuentas', soloConSaldo, search],
     queryFn: () => fetchCuentas(soloConSaldo, search),
-  });
-
-  // Query para detalle de cuenta
-  const { data: cuentaDetalle, isLoading: loadingDetalle } = useQuery({
-    queryKey: ['cuenta-detalle', selectedCuenta?.miembro_uuid],
-    queryFn: () => fetchCuentaDetalle(selectedCuenta?.miembro_uuid),
-    enabled: !!selectedCuenta?.miembro_uuid && showDetalleModal,
   });
 
   // Mutation para registrar abono
@@ -120,8 +111,8 @@ const POSCuentas = () => {
   };
 
   const handleVerDetalle = (cuenta) => {
-    setSelectedCuenta(cuenta);
-    setShowDetalleModal(true);
+    // Navegar a la página de detalle de cuenta
+    navigate(`/pos/cuentas/${cuenta.miembro_uuid}`);
   };
 
   const handleAbrirAbono = (cuenta) => {
@@ -145,7 +136,7 @@ const POSCuentas = () => {
 
   const getMiembroNombre = (cuenta) => {
     const miembro = cuenta.miembros || {};
-    return `${miembro.nombre || ''} ${miembro.apellido || ''}`.trim() || 'Sin nombre';
+    return `${miembro.nombres || ''} ${miembro.apellidos || ''}`.trim() || 'Sin nombre';
   };
 
   return (
@@ -312,127 +303,6 @@ const POSCuentas = () => {
           )}
         </CardContent>
       </Card>
-
-      {/* Modal de detalle */}
-      <Dialog open={showDetalleModal} onOpenChange={setShowDetalleModal}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Historial de Cuenta
-            </DialogTitle>
-            <DialogDescription>
-              {selectedCuenta && getMiembroNombre(selectedCuenta)}
-            </DialogDescription>
-          </DialogHeader>
-
-          {loadingDetalle ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-            </div>
-          ) : cuentaDetalle && (
-            <div className="space-y-6">
-              {/* Resumen */}
-              <div className="grid grid-cols-2 gap-4">
-                <Card>
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-gray-600">Saldo Deudor</p>
-                    <p className={`text-2xl font-bold ${(cuentaDetalle.cuenta?.saldo_deudor || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      ${(cuentaDetalle.cuenta?.saldo_deudor || 0).toFixed(2)}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-gray-600">Límite de Crédito</p>
-                    <p className="text-2xl font-bold">
-                      ${(cuentaDetalle.cuenta?.limite_credito || 0).toFixed(2)}
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Ventas fiadas */}
-              <div>
-                <h4 className="font-semibold mb-3">Ventas Fiadas Recientes</h4>
-                {(cuentaDetalle.ventas_fiadas || []).length === 0 ? (
-                  <p className="text-gray-500 text-sm">Sin ventas fiadas</p>
-                ) : (
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Fecha</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
-                          <TableHead>Estado</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {cuentaDetalle.ventas_fiadas.slice(0, 10).map((venta) => (
-                          <TableRow key={venta.uuid}>
-                            <TableCell>
-                              {new Date(venta.created_at).toLocaleDateString('es-ES')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              ${(venta.total || 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={venta.estado === 'pagada' ? 'default' : 'secondary'}>
-                                {venta.estado}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </div>
-
-              {/* Abonos */}
-              <div>
-                <h4 className="font-semibold mb-3">Abonos Realizados</h4>
-                {(cuentaDetalle.abonos || []).length === 0 ? (
-                  <p className="text-gray-500 text-sm">Sin abonos registrados</p>
-                ) : (
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Fecha</TableHead>
-                          <TableHead className="text-right">Monto</TableHead>
-                          <TableHead>Descripción</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {cuentaDetalle.abonos.slice(0, 10).map((abono) => (
-                          <TableRow key={abono.uuid}>
-                            <TableCell>
-                              {new Date(abono.fecha).toLocaleDateString('es-ES')}
-                            </TableCell>
-                            <TableCell className="text-right text-green-600 font-medium">
-                              +${(abono.monto || 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell className="text-gray-500">
-                              {abono.descripcion || '-'}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDetalleModal(false)}>
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Modal de abono */}
       <Dialog open={showAbonoModal} onOpenChange={setShowAbonoModal}>

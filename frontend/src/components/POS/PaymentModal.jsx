@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { createVenta } from '../../services/api';
 import api from '../../lib/api';
 import usePOSStore from '../../stores/posStore';
+import RegistroClienteTemporal from '../RegistroClienteTemporal';
 
 /**
  * Modal de pago para finalizar venta
@@ -47,6 +48,7 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
   const [selectedMiembro, setSelectedMiembro] = useState(null);
   const [loadingMiembros, setLoadingMiembros] = useState(false);
   const [isFiado, setIsFiado] = useState(false);
+  const [showRegistroTemporal, setShowRegistroTemporal] = useState(false);
 
   const total = currentTicket?.total || 0;
   const vuelto = montoRecibido ? parseFloat(montoRecibido) - total : 0;
@@ -295,7 +297,18 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
                   </div>
                 )}
                 {searchMiembro.length >= 2 && miembros.length === 0 && !loadingMiembros && (
-                  <p className="text-sm text-gray-500 mt-1">No se encontraron miembros</p>
+                  <div className="text-sm text-gray-500 mt-1 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="mb-2">No se encontraron miembros</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowRegistroTemporal(true)}
+                      className="w-full"
+                    >
+                      + Registrar Cliente Temporal
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
@@ -465,6 +478,19 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
           </div>
         </div>
       </DialogContent>
+
+      {/* Modal para registrar cliente temporal */}
+      <RegistroClienteTemporal
+        open={showRegistroTemporal}
+        onOpenChange={setShowRegistroTemporal}
+        onClienteCreado={(nuevoCliente) => {
+          console.log('Cliente temporal creado:', nuevoCliente);
+          setSelectedMiembro(nuevoCliente);
+          toast.info('Cliente registrado temporalmente', {
+            description: 'Requiere verificación de administrador'
+          });
+        }}
+      />
     </Dialog>
   );
 };

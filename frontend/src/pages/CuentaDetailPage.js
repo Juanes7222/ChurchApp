@@ -192,16 +192,25 @@ const CuentaDetailPage = () => {
     });
   };
 
-  const getMovimientoIcon = (tipo) => {
+  const getMovimientoIcon = (tipo, className = "h-4 w-4") => {
+    const baseClasses = tipo === 'cargo' ? 'text-red-500' :
+                        tipo === 'pago' ? 'text-green-500' :
+                        tipo === 'venta_directa' ? 'text-emerald-500' :
+                        tipo === 'ajuste' ? 'text-blue-500' : 'text-gray-500';
+    
+    const finalClasses = className.includes('text-') ? className : `${className} ${baseClasses}`;
+    
     switch (tipo) {
       case 'cargo':
-        return <TrendingUp className="h-4 w-4 text-red-500" />;
+        return <TrendingUp className={finalClasses} />;
       case 'pago':
-        return <TrendingDown className="h-4 w-4 text-green-500" />;
+        return <TrendingDown className={finalClasses} />;
+      case 'venta_directa':
+        return <CheckCircle2 className={finalClasses} />;
       case 'ajuste':
-        return <FileText className="h-4 w-4 text-blue-500" />;
+        return <FileText className={finalClasses} />;
       default:
-        return <DollarSign className="h-4 w-4 text-gray-500" />;
+        return <DollarSign className={finalClasses} />;
     }
   };
 
@@ -211,6 +220,8 @@ const CuentaDetailPage = () => {
         return 'destructive';
       case 'pago':
         return 'default';
+      case 'venta_directa':
+        return 'default'; // Verde
       case 'ajuste':
         return 'secondary';
       default:
@@ -372,83 +383,108 @@ const CuentaDetailPage = () => {
               No hay movimientos registrados
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-4 relative">
+              {/* Timeline vertical */}
+              <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200" />
+              
               {movimientos.movimientos.map((movimiento, index) => {
                 const esUltimo = index === movimientos.movimientos.length - 1;
                 
                 return (
-                  <Accordion key={movimiento.uuid || movimiento.id} type="single" collapsible>
-                    <AccordionItem value="item-1" className="border rounded-lg px-4">
-                      <AccordionTrigger className="hover:no-underline">
-                        <div className="flex items-center justify-between w-full pr-4">
-                          <div className="flex items-center gap-3">
-                            {getMovimientoIcon(movimiento.tipo)}
-                            <div className="text-left">
-                              <div className="flex items-center gap-2">
-                                <Badge variant={getMovimientoBadgeVariant(movimiento.tipo)}>
-                                  {movimiento.tipo?.toUpperCase()}
-                                </Badge>
-                                <span className="text-sm text-gray-600">
-                                  {new Date(movimiento.fecha).toLocaleString('es-ES', {
-                                    dateStyle: 'medium',
-                                    timeStyle: 'short'
-                                  })}
-                                </span>
+                  <div key={movimiento.uuid || movimiento.id} className="relative pl-14">
+                    {/* Indicador de timeline */}
+                    <div className={`absolute left-3 top-4 w-6 h-6 rounded-full border-4 border-white ${
+                      movimiento.tipo === 'cargo' ? 'bg-red-500' :
+                      movimiento.tipo === 'pago' ? 'bg-green-500' :
+                      movimiento.tipo === 'venta_directa' ? 'bg-emerald-500' :
+                      'bg-blue-500'
+                    } shadow-md z-10`}>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        {getMovimientoIcon(movimiento.tipo, 'w-3 h-3 text-white')}
+                      </div>
+                    </div>
+
+                    {/* Tarjeta del movimiento con acordeón */}
+                    <Card className={`shadow-sm hover:shadow-md transition-shadow ${
+                      movimiento.tipo === 'cargo' ? 'border-l-4 border-l-red-500' :
+                      movimiento.tipo === 'pago' ? 'border-l-4 border-l-green-500' :
+                      movimiento.tipo === 'venta_directa' ? 'border-l-4 border-l-emerald-500' :
+                      'border-l-4 border-l-blue-500'
+                    }`}>
+                      <Accordion type="single" collapsible>
+                        <AccordionItem value="detalles" className="border-none">
+                          <AccordionTrigger className="px-4 pt-4 pb-2 hover:no-underline">
+                            <div className="flex items-start justify-between w-full pr-2">
+                              <div className="flex-1 text-left">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Badge variant={getMovimientoBadgeVariant(movimiento.tipo)} className="text-xs">
+                                    {movimiento.tipo === 'cargo' ? '🛒 COMPRA AL CRÉDITO' :
+                                     movimiento.tipo === 'pago' ? '💵 PAGO' :
+                                     movimiento.tipo === 'venta_directa' ? '✅ COMPRA PAGADA' :
+                                     '📝 AJUSTE'}
+                                  </Badge>
+                                  <span className="text-xs text-gray-500">
+                                    {new Date(movimiento.fecha).toLocaleString('es-ES', {
+                                      dateStyle: 'medium',
+                                      timeStyle: 'short'
+                                    })}
+                                  </span>
+                                </div>
+                                {movimiento.descripcion && (
+                                  <p className="text-sm text-gray-600 font-medium">
+                                    {movimiento.descripcion}
+                                  </p>
+                                )}
                               </div>
-                              <p className="text-sm text-gray-700 mt-1">
-                                {movimiento.descripcion || 'Sin descripción'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className={`text-lg font-bold ${
-                              movimiento.tipo === 'cargo' ? 'text-red-600' : 
-                              movimiento.tipo === 'pago' ? 'text-green-600' : 
-                              'text-blue-600'
-                            }`}>
-                              {movimiento.tipo === 'cargo' ? '+' : 
-                               movimiento.tipo === 'pago' ? '-' : ''}
-                              ${Math.abs(movimiento.monto || 0).toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="pt-4 pb-2 space-y-3 border-t">
-                          {/* Detalles del movimiento */}
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <span className="text-gray-600">ID:</span>
-                              <span className="ml-2 font-mono">{movimiento.uuid?.slice(0, 8)}</span>
-                            </div>
-                            {movimiento.created_by_uuid && (
-                              <div>
-                                <span className="text-gray-600">Registrado por:</span>
-                                <span className="ml-2 font-mono">
-                                  {movimiento.created_by_uuid.slice(0, 8)}
-                                </span>
+                              <div className="text-right ml-4">
+                                <p className={`text-2xl font-bold ${
+                                  movimiento.tipo === 'cargo' ? 'text-red-600' : 
+                                  movimiento.tipo === 'pago' ? 'text-green-600' : 
+                                  movimiento.tipo === 'venta_directa' ? 'text-emerald-600' : 
+                                  'text-blue-600'
+                                }`}>
+                                  {movimiento.tipo === 'cargo' ? '+' : 
+                                   movimiento.tipo === 'pago' ? '-' : ''}
+                                  ${Math.abs(movimiento.monto || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+                                </p>
                               </div>
+                            </div>
+                          </AccordionTrigger>
+                          
+                          <AccordionContent className="px-4 pb-4">
+                            {/* Detalles de la compra (si es cargo o venta directa) */}
+                            {(movimiento.tipo === 'cargo' || movimiento.tipo === 'venta_directa') && movimiento.venta_uuid && (
+                              <VentaDetail ventaUuid={movimiento.venta_uuid} esPagada={movimiento.tipo === 'venta_directa'} />
                             )}
-                          </div>
 
-                          {/* Si es un cargo con venta asociada, mostrar detalle de venta */}
-                          {movimiento.tipo === 'cargo' && movimiento.venta_uuid && (
-                            <VentaDetail ventaUuid={movimiento.venta_uuid} />
-                          )}
-
-                          {/* Ticket number si está disponible */}
-                          {movimiento.ventas?.ticket_number && (
-                            <div className="text-sm">
-                              <span className="text-gray-600">Ticket #:</span>
-                              <span className="ml-2 font-semibold">
-                                {movimiento.ventas.ticket_number}
-                              </span>
+                            {/* Información adicional */}
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <div className="flex items-center justify-between text-xs text-gray-500">
+                                <div className="flex items-center gap-4">
+                                  <span className="font-mono">
+                                    ID: {movimiento.uuid?.slice(0, 8)}
+                                  </span>
+                                  {movimiento.ventas?.numero_ticket && (
+                                    <span className="flex items-center gap-1">
+                                      <FileText className="h-3 w-3" />
+                                      Ticket #{movimiento.ventas.numero_ticket}
+                                    </span>
+                                  )}
+                                </div>
+                                {movimiento.tipo === 'pago' && movimiento.metodo_pago && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {movimiento.metodo_pago === 'efectivo' ? '💵 Efectivo' :
+                                     movimiento.metodo_pago === 'transferencia' ? '📱 Transferencia' :
+                                     movimiento.metodo_pago}
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </Card>
+                  </div>
                 );
               })}
 
@@ -640,7 +676,7 @@ const CuentaDetailPage = () => {
 };
 
 // Componente auxiliar para mostrar detalles de venta
-const VentaDetail = ({ ventaUuid }) => {
+const VentaDetail = ({ ventaUuid, esPagada = false }) => {
   const { data: venta, isLoading } = useQuery({
     queryKey: ['venta-detalle', ventaUuid],
     queryFn: () => fetchVentaDetalle(ventaUuid),
@@ -659,27 +695,58 @@ const VentaDetail = ({ ventaUuid }) => {
     return null;
   }
 
+  const bgColor = esPagada ? 'from-emerald-50 to-emerald-100' : 'from-gray-50 to-gray-100';
+  const iconBgColor = esPagada ? 'bg-emerald-100' : 'bg-red-100';
+  const iconTextColor = esPagada ? 'text-emerald-600' : 'text-red-600';
+  const totalColor = esPagada ? 'text-emerald-600' : 'text-red-600';
+
   return (
-    <div className="mt-3 bg-gray-50 rounded-lg p-3">
-      <h5 className="font-semibold text-sm mb-2 flex items-center gap-2">
-        <ShoppingCart className="h-4 w-4" />
-        Detalle de Compra
-      </h5>
-      <div className="space-y-1">
+    <div className={`mt-3 bg-gradient-to-br ${bgColor} rounded-lg p-4 border border-gray-200`}>
+      <div className="flex items-center gap-2 mb-3">
+        <div className={`${iconBgColor} p-2 rounded-lg`}>
+          <ShoppingCart className={`h-4 w-4 ${iconTextColor}`} />
+        </div>
+        <h5 className="font-bold text-sm text-gray-800">
+          Productos Comprados {esPagada && <span className="text-emerald-600">(Pagado)</span>}
+        </h5>
+      </div>
+      
+      <div className="space-y-2">
         {venta.items.map((item, idx) => (
-          <div key={idx} className="flex justify-between text-sm">
-            <span className="text-gray-700">
-              {item.cantidad}x {item.productos?.nombre || 'Producto'}
-            </span>
-            <span className="font-medium">
-              ${(item.precio_unitario * item.cantidad).toFixed(2)}
-            </span>
+          <div key={idx} className="bg-white rounded-lg p-3 shadow-sm">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <p className="font-semibold text-gray-900">
+                  {item.productos?.nombre || 'Producto'}
+                </p>
+                <div className="flex items-center gap-3 mt-1 text-xs text-gray-600">
+                  <span className="flex items-center gap-1">
+                    <span className="font-semibold">Cantidad:</span>
+                    {item.cantidad}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="font-semibold">Precio Unit:</span>
+                    ${item.precio_unitario?.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right ml-3">
+                <p className="text-lg font-bold text-gray-900">
+                  ${(item.precio_unitario * item.cantidad).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+                </p>
+              </div>
+            </div>
           </div>
         ))}
       </div>
-      <div className="border-t mt-2 pt-2 flex justify-between text-sm font-semibold">
-        <span>Total:</span>
-        <span>${venta.total.toFixed(2)}</span>
+      
+      <div className="mt-3 pt-3 border-t-2 border-gray-300">
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-bold text-gray-700">Total de la Compra:</span>
+          <span className={`text-xl font-bold ${totalColor}`}>
+            ${venta.total?.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+          </span>
+        </div>
       </div>
     </div>
   );

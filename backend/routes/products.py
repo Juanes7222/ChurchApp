@@ -987,8 +987,28 @@ async def get_cuenta_miembro(
         todos_movimientos = supabase.table('movimientos_cuenta').select('tipo, monto').eq('cuenta_uuid', cuenta.get('uuid')).eq('is_deleted', False).execute()
         
         # Calcular estadísticas usando TODOS los movimientos
-        total_cargos = sum(float(m.get('monto', 0)) for m in (todos_movimientos.data or []) if m.get('tipo') == 'cargo')
-        total_pagos = sum(float(m.get('monto', 0)) for m in (todos_movimientos.data or []) if m.get('tipo') == 'pago')
+        total_cargos = 0
+        total_pagos = 0
+        saldo_calculado = 0
+        
+        for mov in (todos_movimientos.data or []):
+            monto = float(mov.get('monto', 0))
+            if mov.get('tipo') == 'cargo':
+                total_cargos += monto
+                saldo_calculado += monto
+            elif mov.get('tipo') == 'pago':
+                total_pagos += monto
+                saldo_calculado -= monto
+            elif mov.get('tipo') == 'ajuste':
+                saldo_calculado += monto
+        
+        # Actualizar el saldo en la tabla para mantener sincronización
+        if abs(saldo_calculado - float(cuenta.get('saldo_deudor', 0))) > 0.01:
+            supabase.table('cuentas_miembro').update({
+                'saldo_deudor': saldo_calculado,
+                'updated_at': datetime.now(timezone.utc).isoformat()
+            }).eq('uuid', cuenta.get('uuid')).execute()
+            cuenta['saldo_deudor'] = saldo_calculado
         
         return {
             "cuenta": cuenta,
@@ -997,7 +1017,7 @@ async def get_cuenta_miembro(
             "estadisticas": {
                 "total_cargos": total_cargos,
                 "total_pagos": total_pagos,
-                "saldo_actual": float(cuenta.get('saldo_deudor', 0))
+                "saldo_actual": saldo_calculado  # Usar saldo calculado, no el de la tabla
             }
         }
     except HTTPException:
@@ -1013,7 +1033,8 @@ async def get_movimientos_cuenta(
     offset: int = 0,
     current_user: Dict[str, Any] = Depends(require_auth_user)
 ) -> Dict[str, Any]:
-    """Obtener historial completo de movimientos de una cuenta con paginación"""
+    """Obtener historial completo de movimientos de una cuenta con paginación
+    Incluye movimientos de cuenta (cargos/pagos/ajustes) y ventas pagadas directamente"""
     try:
         # Verificar que existe la cuenta
         cuenta_result = supabase.table('cuentas_miembro').select('uuid').eq('miembro_uuid', miembro_uuid).execute()
@@ -1026,16 +1047,50 @@ async def get_movimientos_cuenta(
         if not cuenta_uuid:
             raise HTTPException(status_code=404, detail="UUID de cuenta no disponible")
         
-        # Obtener movimientos con paginación (sin join - haremos lookup manual si es necesario)
-        movimientos_result = supabase.table('movimientos_cuenta').select('*').eq('cuenta_uuid', cuenta_uuid).eq('is_deleted', False).order('fecha', desc=True).range(offset, offset + limit - 1).execute()
+        # Obtener movimientos de cuenta (cargos, pagos, ajustes)
+        movimientos_result = supabase.table('movimientos_cuenta').select('*').eq('cuenta_uuid', cuenta_uuid).eq('is_deleted', False).execute()
         
-        # Contar total de movimientos
-        count_result = supabase.table('movimientos_cuenta').select('uuid', count='exact').eq('cuenta_uuid', cuenta_uuid).eq('is_deleted', False).execute()
+        # Obtener ventas pagadas directamente (no fiadas) del miembro
+        ventas_pagadas_result = supabase.table('ventas').select(
+            'uuid, total, created_at, numero_ticket, is_fiado'
+        ).eq('miembro_uuid', miembro_uuid).eq('is_fiado', False).eq('is_deleted', False).execute()
         
-        total_count = count_result.count if hasattr(count_result, 'count') else len(movimientos_result.data or [])
+        # Combinar y formatear todos los items
+        items = []
+        
+        # Agregar movimientos de cuenta
+        for mov in (movimientos_result.data or []):
+            items.append({
+                **mov,
+                'item_type': 'movimiento',
+                'fecha': mov.get('fecha') or mov.get('created_at')
+            })
+        
+        # Agregar ventas pagadas directamente como un tipo especial
+        for venta in (ventas_pagadas_result.data or []):
+            items.append({
+                'uuid': venta.get('uuid'),
+                'tipo': 'venta_directa',
+                'item_type': 'venta_directa',
+                'monto': float(venta.get('total', 0)),
+                'fecha': venta.get('created_at'),
+                'descripcion': f"Compra pagada - Ticket #{venta.get('numero_ticket')}",
+                'venta_uuid': venta.get('uuid'),
+                'ventas': {
+                    'numero_ticket': venta.get('numero_ticket'),
+                    'total': venta.get('total')
+                }
+            })
+        
+        # Ordenar todos los items por fecha descendente
+        items.sort(key=lambda x: x.get('fecha', ''), reverse=True)
+        
+        # Aplicar paginación
+        total_count = len(items)
+        items_paginados = items[offset:offset + limit]
         
         return {
-            "movimientos": movimientos_result.data or [],
+            "movimientos": items_paginados,
             "total": total_count,
             "limit": limit,
             "offset": offset,
@@ -1069,16 +1124,31 @@ async def registrar_abono(
             raise HTTPException(status_code=404, detail="Cuenta no encontrada")
         
         cuenta = cuenta_result.data[0]
-        saldo_actual = float(cuenta.get('saldo_deudor', 0))
+        cuenta_uuid = cuenta.get('uuid')
         
-        if float(monto) > saldo_actual:
-            raise HTTPException(status_code=400, detail=f"El abono excede el saldo deudor (${saldo_actual:.2f})")
+        # CALCULAR SALDO REAL desde movimientos (no confiar en saldo_deudor de la tabla)
+        todos_movimientos = supabase.table('movimientos_cuenta').select('tipo, monto').eq('cuenta_uuid', cuenta_uuid).eq('is_deleted', False).execute()
+        
+        saldo_real = 0
+        for mov in (todos_movimientos.data or []):
+            if mov.get('tipo') == 'cargo':
+                saldo_real += float(mov.get('monto', 0))
+            elif mov.get('tipo') == 'pago':
+                saldo_real -= float(mov.get('monto', 0))
+            elif mov.get('tipo') == 'ajuste':
+                saldo_real += float(mov.get('monto', 0))
+        
+        if float(monto) > saldo_real:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"El abono (${float(monto):,.0f}) excede el saldo deudor real (${saldo_real:,.0f})"
+            )
         
         # Registrar movimiento de tipo 'pago'
         movimiento_uuid = str(uuid.uuid4())
         movimiento_data = {
             'uuid': movimiento_uuid,
-            'cuenta_uuid': cuenta.get('uuid'),
+            'cuenta_uuid': cuenta_uuid,
             'tipo': 'pago',
             'monto': float(monto),
             'descripcion': f"Abono - {metodo_pago}" + (f" - {notas}" if notas else ""),
@@ -1091,8 +1161,8 @@ async def registrar_abono(
         if not movimiento_result.data:
             raise HTTPException(status_code=500, detail="Error al registrar abono")
         
-        # Actualizar saldo
-        nuevo_saldo = saldo_actual - float(monto)
+        # Recalcular y actualizar saldo en la tabla
+        nuevo_saldo = saldo_real - float(monto)
         supabase.table('cuentas_miembro').update({
             'saldo_deudor': nuevo_saldo,
             'updated_at': datetime.now(timezone.utc).isoformat()
@@ -1100,7 +1170,7 @@ async def registrar_abono(
         
         return {
             "abono": movimiento_result.data[0],
-            "saldo_anterior": saldo_actual,
+            "saldo_anterior": saldo_real,
             "nuevo_saldo": nuevo_saldo
         }
     except HTTPException:

@@ -120,18 +120,18 @@ const POS = () => {
           </Card>
         </Can>
 
-        {/* Productos */}
+        {/* Productos e Inventario - SOLO UNA TARJETA */}
         <Can permission={PERMISSIONS.VIEW_POS}>
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Package className="h-5 w-5 text-blue-600" />
-                Productos
+                Productos e Inventario
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600 mb-4">
-                Ver y gestionar el catálogo de productos
+                Catálogo, precios y stock de productos
               </p>
               <Button 
                 className="w-full" 
@@ -165,56 +165,6 @@ const POS = () => {
               >
                 <Users className="h-4 w-4 mr-2" />
                 Ver Cuentas
-              </Button>
-            </CardContent>
-          </Card>
-        </Can>
-
-        {/* Gestión de Productos (Solo agente) */}
-        <Can permission={PERMISSIONS.MANAGE_PRODUCTS}>
-          <Card className="hover:shadow-lg transition-shadow border-orange-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5 text-orange-600" />
-                Gestión de Productos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-600 mb-4">
-                Crear, editar y eliminar productos
-              </p>
-              <Button 
-                className="w-full" 
-                variant="outline" 
-                onClick={() => navigate('/pos/productos')}
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Gestionar Productos
-              </Button>
-            </CardContent>
-          </Card>
-        </Can>
-
-        {/* Precios (Solo agente) */}
-        <Can permission={PERMISSIONS.EDIT_PRICES}>
-          <Card className="hover:shadow-lg transition-shadow border-orange-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-orange-600" />
-                Gestión de Precios
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-600 mb-4">
-                Actualizar precios de productos
-              </p>
-              <Button 
-                className="w-full" 
-                variant="outline" 
-                onClick={() => navigate('/pos/productos')}
-              >
-                <DollarSign className="h-4 w-4 mr-2" />
-                Editar Precios
               </Button>
             </CardContent>
           </Card>
@@ -265,31 +215,6 @@ const POS = () => {
               >
                 <FileText className="h-4 w-4 mr-2" />
                 Ver Reportes
-              </Button>
-            </CardContent>
-          </Card>
-        </Can>
-
-        {/* Inventario */}
-        <Can permission={PERMISSIONS.VIEW_INVENTORY}>
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-indigo-600" />
-                Inventario
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-600 mb-4">
-                Consultar stock disponible
-              </p>
-              <Button 
-                className="w-full" 
-                variant="outline" 
-                onClick={() => navigate('/pos/inventario')}
-              >
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Ver Inventario
               </Button>
             </CardContent>
           </Card>

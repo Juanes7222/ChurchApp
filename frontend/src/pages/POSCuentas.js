@@ -242,9 +242,6 @@ const POSCuentas = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Miembro</TableHead>
-                  <TableHead>Contacto</TableHead>
-                  <TableHead className="text-right">Saldo Deudor</TableHead>
-                  <TableHead className="text-right">Límite Crédito</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -255,20 +252,8 @@ const POSCuentas = () => {
                     <TableCell className="font-medium">
                       {getMiembroNombre(cuenta)}
                     </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div>{cuenta.miembros?.email}</div>
-                        <div className="text-gray-500">{cuenta.miembros?.telefono}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <span className={`font-bold ${(cuenta.saldo_deudor || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        ${(cuenta.saldo_deudor || 0).toFixed(2)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      ${(cuenta.limite_credito || 0).toFixed(2)}
-                    </TableCell>
+                    
+                   
                     <TableCell>
                       {(cuenta.saldo_deudor || 0) > 0 ? (
                         <Badge variant="destructive">Con saldo</Badge>

@@ -547,17 +547,32 @@ async def open_shift(
             # Convertir de vuelta a UTC
             fin_validity_utc = fin_validity_col.astimezone(timezone.utc)
             
-            for idx, mesero_pin in enumerate(shift.meseros):
-                mesero_username = f"mesero_{next_num + idx:03d}"
-                mesero_display = f"Mesero {next_num + idx}"
+            for idx, mesero_data_input in enumerate(shift.meseros):
+                # Obtener información del miembro para usar su número de documento
+                miembro_result = supabase.table('miembros').select('uuid, documento, nombres, apellidos').eq('uuid', mesero_data_input.miembro_uuid).execute()
+                
+                if not miembro_result.data:
+                    raise HTTPException(status_code=404, detail=f"Miembro {mesero_data_input.miembro_uuid} no encontrado")
+                
+                miembro = miembro_result.data[0]
+                numero_documento = miembro.get('documento')
+                
+                # Si no tiene documento, usar el UUID como username
+                if not numero_documento or numero_documento.strip() == '':
+                    mesero_username = f"mesero_{miembro.get('uuid')[:8]}"  # Usar primeros 8 chars del UUID
+                else:
+                    mesero_username = numero_documento  # Usar número de documento como username
+                
+                mesero_display = f"{miembro.get('nombres')} {miembro.get('apellidos')}"
                 
                 # Hash del PIN (usar SHA256 simple por ahora)
-                pin_hash = hashlib.sha256(mesero_pin.pin.encode()).hexdigest()
+                pin_hash = hashlib.sha256(mesero_data_input.pin.encode()).hexdigest()
                 
                 mesero_data = {
                     'uuid': str(uuid_lib.uuid4()),
                     'username': mesero_username,
                     'display_name': mesero_display,
+                    'miembro_uuid': mesero_data_input.miembro_uuid,
                     'pin_hash': pin_hash,
                     'creado_por_uuid': current_user.get('sub'),  # JWT usa 'sub' para el user ID
                     'activo': True,
@@ -764,6 +779,21 @@ async def create_usuario_temporal(
 ) -> Dict[str, Any]:
     """RF-USER-01: Crear usuario temporal con PIN hasheado"""
     try:
+        # Validar PIN: debe tener al menos 4 caracteres y solo dígitos
+        if not usuario.pin or len(usuario.pin) < 4:
+            raise HTTPException(status_code=400, detail="El PIN debe tener al menos 4 dígitos")
+        
+        if not usuario.pin.isdigit():
+            raise HTTPException(status_code=400, detail="El PIN solo puede contener números")
+        
+        # Validar que el miembro existe
+        if not usuario.miembro_uuid:
+            raise HTTPException(status_code=400, detail="Debe asociar el usuario temporal a un miembro")
+        
+        miembro_result = supabase.table('miembros').select('uuid').eq('uuid', usuario.miembro_uuid).execute()
+        if not miembro_result.data:
+            raise HTTPException(status_code=404, detail="El miembro especificado no existe")
+        
         # Hashear PIN con bcrypt
         hashed_pin = bcrypt.hashpw(usuario.pin.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         

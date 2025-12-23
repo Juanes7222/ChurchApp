@@ -152,6 +152,7 @@ class Venta(BaseModel):
 # --- Shift Models ---
 class MeseroPin(BaseModel):
     pin: str  # PIN de 4 dígitos para el mesero
+    miembro_uuid: str  # UUID del miembro asociado
 
 class CajaShiftCreate(BaseModel):
     apertura_por: str  # Firebase UID (not a standard UUID)
@@ -172,6 +173,7 @@ class UsuarioTemporalCreate(BaseModel):
     username: str
     display_name: str
     pin: str
+    miembro_uuid: str  # Campo obligatorio: debe estar asociado a un miembro
     fin_validity: Optional[datetime] = None
     creado_por_uuid: str
 

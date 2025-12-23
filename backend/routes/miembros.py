@@ -17,9 +17,9 @@ async def list_miembros(
     grupo: Optional[str] = None,
     page: int = 1,
     page_size: int = 50,
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_any_authenticated)
 ):
-    """List members with search and filters"""
+    """List members with search and filters - Accessible by any authenticated user including meseros"""
     query = supabase.table('miembros').select('*', count='exact').eq('is_deleted', False)
     
     if q:

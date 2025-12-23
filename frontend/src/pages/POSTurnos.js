@@ -5,6 +5,13 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 import { 
   Dialog, 
   DialogContent, 
@@ -43,6 +50,11 @@ const fetchShifts = async () => {
   return response.data.shifts || [];
 };
 
+const fetchMiembros = async () => {
+  const response = await api.get('/miembros');
+  return response.data.miembros || [];
+};
+
 const openShift = async (shiftData) => {
   const response = await api.post('/pos/caja-shifts', shiftData);
   return response.data;
@@ -76,7 +88,7 @@ const POSTurnos = () => {
   const [openFormData, setOpenFormData] = useState({
     monto_apertura: '',
     notas: '',
-    meseros: [{ pin: '' }], // Iniciar con un mesero
+    meseros: [{ pin: '', miembro_uuid: '' }], // Incluir miembro_uuid
   });
   const [closeFormData, setCloseFormData] = useState({
     monto_cierre: '',
@@ -87,6 +99,12 @@ const POSTurnos = () => {
   const { data: shifts = [], isLoading } = useQuery({
     queryKey: ['caja-shifts'],
     queryFn: fetchShifts,
+  });
+
+  // Query miembros para selector
+  const { data: miembros = [] } = useQuery({
+    queryKey: ['miembros'],
+    queryFn: fetchMiembros,
   });
 
   // Mutación para abrir turno
@@ -108,7 +126,7 @@ const POSTurnos = () => {
       
       toast.success(`Turno abierto exitosamente${meserosMsg}`);
       setShowOpenModal(false);
-      setOpenFormData({ monto_apertura: '', notas: '', meseros: [{ pin: '' }] });
+      setOpenFormData({ monto_apertura: '', notas: '', meseros: [{ pin: '', miembro_uuid: '' }] });
       
       // Navegar a ventas automáticamente
       navigate('/pos/ventas');
@@ -143,20 +161,30 @@ const POSTurnos = () => {
   const handleOpenShift = (e) => {
     e.preventDefault();
     
-    // Filtrar meseros que tengan PIN ingresado
-    const meserosConPin = openFormData.meseros.filter(m => m.pin && m.pin.trim().length === 4);
+    // Validar que cada mesero tenga PIN y miembro asociado
+    const meserosValidos = openFormData.meseros.filter(m => 
+      m.pin && 
+      m.pin.trim().length === 4 && 
+      m.miembro_uuid && 
+      m.miembro_uuid.trim() !== ''
+    );
+    
+    if (meserosValidos.length === 0) {
+      toast.error('Debes agregar al menos un mesero con PIN y miembro asociado');
+      return;
+    }
     
     openMutation.mutate({
       apertura_por: user?.uid,
       efectivo_inicial: parseFloat(openFormData.monto_apertura) || 0,
-      meseros: meserosConPin,
+      meseros: meserosValidos,
     });
   };
 
   const addMesero = () => {
     setOpenFormData({
       ...openFormData,
-      meseros: [...openFormData.meseros, { pin: '' }]
+      meseros: [...openFormData.meseros, { pin: '', miembro_uuid: '' }]
     });
   };
 
@@ -164,13 +192,22 @@ const POSTurnos = () => {
     const newMeseros = openFormData.meseros.filter((_, i) => i !== index);
     setOpenFormData({
       ...openFormData,
-      meseros: newMeseros.length > 0 ? newMeseros : [{ pin: '' }]
+      meseros: newMeseros.length > 0 ? newMeseros : [{ pin: '', miembro_uuid: '' }]
     });
   };
 
   const updateMeseroPin = (index, pin) => {
     const newMeseros = [...openFormData.meseros];
-    newMeseros[index] = { pin };
+    newMeseros[index] = { ...newMeseros[index], pin };
+    setOpenFormData({
+      ...openFormData,
+      meseros: newMeseros
+    });
+  };
+
+  const updateMeseroMiembro = (index, miembro_uuid) => {
+    const newMeseros = [...openFormData.meseros];
+    newMeseros[index] = { ...newMeseros[index], miembro_uuid };
     setOpenFormData({
       ...openFormData,
       meseros: newMeseros
@@ -400,7 +437,7 @@ const POSTurnos = () => {
               {/* Sección de Meseros */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>Meseros (opcional)</Label>
+                  <Label>Meseros *</Label>
                   <Button 
                     type="button" 
                     variant="outline" 
@@ -410,31 +447,57 @@ const POSTurnos = () => {
                     + Agregar Mesero
                   </Button>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {openFormData.meseros.map((mesero, index) => (
-                    <div key={index} className="flex gap-2 items-center">
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        maxLength="4"
-                        placeholder="PIN de 4 dígitos"
-                        value={mesero.pin}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, '');
-                          updateMeseroPin(index, val);
-                        }}
-                      />
-                      {openFormData.meseros.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeMesero(index)}
+                    <div key={index} className="border rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Mesero {index + 1}</span>
+                        {openFormData.meseros.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeMesero(index)}
+                          >
+                            ✕
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label className="text-xs">Miembro Asociado *</Label>
+                        <Select
+                          value={mesero.miembro_uuid}
+                          onValueChange={(value) => updateMeseroMiembro(index, value)}
                         >
-                          ✕
-                        </Button>
-                      )}
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona un miembro" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {miembros.map((m) => (
+                              <SelectItem key={m.uuid} value={m.uuid}>
+                                {m.nombres} {m.apellidos}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs">PIN (4 dígitos) *</Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength="4"
+                          placeholder="Ej: 1234"
+                          value={mesero.pin}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '');
+                            updateMeseroPin(index, val);
+                          }}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -82,7 +82,7 @@ BEGIN
       -- Generar UUID para la nueva cuenta
       v_cuenta_uuid := gen_random_uuid()::text;
       INSERT INTO cuentas_miembro (uuid, miembro_uuid, saldo_deudor, saldo_acumulado, limite_credito, created_at, updated_at)
-      VALUES (v_cuenta_uuid, (p_payload->>'miembro_uuid')::text, v_total, v_total, 0, now(), now());
+      VALUES (v_cuenta_uuid, (p_payload->>'miembro_uuid')::text, v_total, v_total, 300000, now(), now());
     ELSE
       UPDATE cuentas_miembro SET
         saldo_deudor = coalesce(saldo_deudor,0) + v_total,

@@ -51,7 +51,6 @@ const MiembroForm = () => {
     if (isEdit) {
       loadMiembro();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit]);
 
   const loadGrupos = async () => {

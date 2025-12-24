@@ -25,7 +25,6 @@ const POS = () => {
   // Cargar turno activo al montar el componente
   useEffect(() => {
     loadActiveShift();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

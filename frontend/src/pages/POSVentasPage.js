@@ -58,7 +58,6 @@ const POSVentasPage = () => {
       setShiftChecked(true);
     };
     checkShift();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Array vacío para ejecutar solo al montar
   
   // Inicializar vendedor desde sesión de mesero o admin

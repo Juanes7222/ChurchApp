@@ -1,7 +1,16 @@
 from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 from core import config
-from routes import admin_router, auth_router, miembros_router, observaciones_router, grupos_router, dashboard_router, products_router, pos_reportes_router
+from routes import (
+    admin_router, auth_router, miembros_router, observaciones_router, grupos_router, dashboard_router,
+    pos_reportes_router
+)
+from routes.pos_productos import pos_productos_router
+from routes.pos_ventas import pos_ventas_router
+from routes.pos_shifts import pos_shifts_router
+from routes.pos_cuentas import pos_cuentas_router
+from routes.pos_meseros import pos_meseros_router
+from routes.pos_inventario import pos_inventario_router
 import os
 import logging
 
@@ -34,7 +43,14 @@ app.include_router(miembros_router, prefix="/api")
 app.include_router(observaciones_router, prefix="/api")
 app.include_router(grupos_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
-app.include_router(products_router, prefix="/api/pos")
+
+# POS Routers (modularizados)
+app.include_router(pos_productos_router, prefix="/api/pos")
+app.include_router(pos_ventas_router, prefix="/api/pos")
+app.include_router(pos_shifts_router, prefix="/api/pos")
+app.include_router(pos_cuentas_router, prefix="/api/pos")
+app.include_router(pos_meseros_router, prefix="/api/pos")
+app.include_router(pos_inventario_router, prefix="/api/pos")
 app.include_router(pos_reportes_router, prefix="/api/pos")
 
 app.add_middleware(

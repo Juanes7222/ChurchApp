@@ -47,11 +47,11 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4">
       <Card className="w-full max-w-md shadow-xl border-none" data-testid="login-card">
         <CardHeader className="space-y-4 text-center pb-8">
-          <div className="mx-auto w-15 h-14 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+          <div className="mx-auto w-24 h-24 flex items-center justify-center">
             <img 
               src={churchLogo} 
               alt="Logo Iglesia" 
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
           </div>
           <div>

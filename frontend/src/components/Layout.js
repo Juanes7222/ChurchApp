@@ -96,7 +96,7 @@ const Layout = () => {
               <img 
                 src={churchLogo} 
                 alt="Logo Iglesia" 
-                className="w-full h-full object-cover"
+                className="h-10 w-auto object-contain"
               />
               <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 Iglesia

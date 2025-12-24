@@ -169,20 +169,44 @@ async def reporte_ventas(
             ventas = ventas_filtradas
         
         # Calcular totales
-        total_ventas = sum(
-            float(cast(Dict[str, Any], v).get('total', 0))
-            for v in ventas
-            if isinstance(v, dict)
-        )
-        num_ventas = len(ventas)
+        total_ventas = 0.0
+        total_efectivo = 0.0
+        total_fiado = 0.0
+        num_transacciones = len(ventas)
+        ventas_por_dia = {}
+        
+        for v in ventas:
+            if not isinstance(v, dict):
+                continue
+                
+            total = float(v.get('total', 0))
+            total_ventas += total
+            
+            # Clasificar por tipo de pago
+            if v.get('is_fiado'):
+                total_fiado += total
+            else:
+                total_efectivo += total
+            
+            # Agrupar por día
+            fecha_str = v.get('created_at', '')[:10]  # YYYY-MM-DD
+            if fecha_str:
+                if fecha_str not in ventas_por_dia:
+                    ventas_por_dia[fecha_str] = {'cantidad': 0, 'total': 0.0}
+                ventas_por_dia[fecha_str]['cantidad'] += 1
+                ventas_por_dia[fecha_str]['total'] += total
         
         # TODO: Implementar export CSV si formato == 'csv'
         
         return {
             "ventas": ventas,
+            "ventas_por_dia": ventas_por_dia,
             "resumen": {
-                "num_ventas": num_ventas,
-                "total_ventas": total_ventas
+                "num_ventas": num_transacciones,
+                "num_transacciones": num_transacciones,
+                "total_ventas": total_ventas,
+                "total_efectivo": total_efectivo,
+                "total_fiado": total_fiado
             }
         }
     except Exception as e:
@@ -241,8 +265,22 @@ async def reporte_productos(
             reverse=True
         )
         
+        # Formatear para el frontend
+        productos_vendidos = []
+        for p in productos_list:
+            productos_vendidos.append({
+                'producto': {
+                    'uuid': p['producto_uuid'],
+                    'nombre': p['nombre'],
+                    'codigo': p['codigo']
+                },
+                'cantidad_total': p['cantidad_vendida'],
+                'ingresos_total': p['total_vendido']
+            })
+        
         return {
-            "productos": productos_list,
+            "productos_vendidos": productos_vendidos,
+            "total_productos": len(productos_vendidos),
             "resumen": {
                 "num_productos": len(productos_list),
                 "total_items_vendidos": sum(p['cantidad_vendida'] for p in productos_list)
@@ -267,6 +305,8 @@ async def reporte_deudas(
         
         # Filtrar solo cuentas con saldo deudor > 0
         cuentas_deudoras = []
+        todas_cuentas = []
+        
         for cuenta in cuentas:
             if not isinstance(cuenta, dict):
                 continue
@@ -274,24 +314,42 @@ async def reporte_deudas(
             saldo_deudor = float(cuenta.get('saldo_deudor', 0))
             if saldo_deudor > 0:
                 miembro_info = cuenta.get('miembro', {})
-                cuentas_deudoras.append({
+                if isinstance(miembro_info, dict):
+                    nombres = miembro_info.get('nombres', '')
+                    apellidos = miembro_info.get('apellidos', '')
+                    miembro_nombre = f"{nombres} {apellidos}".strip()
+                else:
+                    miembro_nombre = 'N/A'
+                
+                cuenta_data = {
                     'cuenta_uuid': cuenta.get('uuid'),
                     'miembro_uuid': cuenta.get('miembro_uuid'),
-                    'miembro': miembro_info if isinstance(miembro_info, dict) else {},
+                    'miembro_nombre': miembro_nombre,
+                    'miembro_documento': miembro_info.get('documento', '') if isinstance(miembro_info, dict) else '',
                     'saldo_deudor': saldo_deudor,
                     'limite_credito': float(cuenta.get('limite_credito', 0))
-                })
+                }
+                
+                cuentas_deudoras.append(cuenta_data)
+                todas_cuentas.append(cuenta_data)
         
         # Ordenar por saldo deudor descendente
         cuentas_deudoras.sort(key=lambda x: x['saldo_deudor'], reverse=True)
         
+        # Top 10 mayores deudas
+        top_deudas = cuentas_deudoras[:10]
+        
         total_deuda = sum(c['saldo_deudor'] for c in cuentas_deudoras)
+        deuda_promedio = total_deuda / len(cuentas_deudoras) if cuentas_deudoras else 0
         
         return {
-            "deudas": cuentas_deudoras,
+            "top_deudas": top_deudas,
+            "todas_cuentas": todas_cuentas,
             "resumen": {
-                "num_cuentas_deudoras": len(cuentas_deudoras),
-                "total_deuda": total_deuda
+                "miembros_con_deuda": len(cuentas_deudoras),
+                "deuda_total": total_deuda,
+                "deuda_promedio": deuda_promedio,
+                "num_cuentas_deudoras": len(cuentas_deudoras)
             }
         }
     except Exception as e:

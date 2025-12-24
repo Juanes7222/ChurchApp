@@ -28,6 +28,8 @@ class Config:
       security = HTTPBearer()
       FIREBASE_CREDENTIALS_PATH = os.environ.get('FIREBASE_CREDENTIALS_PATH')
       
+      STORAGE_NAME = os.environ.get('STORAGE_NAME', 'default-storage-name')
+      
       if FIREBASE_CREDENTIALS_PATH is None:
           raise ValueError("FIREBASE_CREDENTIALS_PATH environment variable is not set.")
       

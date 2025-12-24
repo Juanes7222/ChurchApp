@@ -1,10 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 import { 
   ArrowLeft, 
   Edit, 
@@ -16,7 +23,8 @@ import {
   FileText,
   Loader2,
   MessageSquare,
-  Send
+  Send,
+  Users
 } from 'lucide-react';
 import api from '../lib/api';
 import { toast } from 'sonner';
@@ -31,6 +39,7 @@ const MiembroDetalle = () => {
   const [nuevaObs, setNuevaObs] = useState('');
   const [loading, setLoading] = useState(true);
   const [savingObs, setSavingObs] = useState(false);
+  const [showFoto, setShowFoto] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -44,6 +53,7 @@ const MiembroDetalle = () => {
       ]);
       setMiembro(miembroRes.data);
       setObservaciones(obsRes.data.observaciones);
+      console.log('Miembro data loaded:', miembroRes.data);
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Error al cargar datos del miembro');
@@ -100,6 +110,16 @@ const MiembroDetalle = () => {
               {miembro.nombres} {miembro.apellidos}
             </h1>
             <p className="text-gray-600 mt-1">{miembro.documento}</p>
+            {miembro.foto_url && (
+              <Button
+                variant="link"
+                size="sm"
+                onClick={() => setShowFoto(true)}
+                className="mt-1 p-0 h-auto text-blue-600"
+              >
+                Ver foto
+              </Button>
+            )}
           </div>
         </div>
         <Button
@@ -203,6 +223,32 @@ const MiembroDetalle = () => {
             </CardContent>
           </Card>
 
+          <Card className="border-none shadow-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Grupos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!miembro.grupos || miembro.grupos.length === 0 ? (
+                <p className="text-sm text-gray-600">No pertenece a ningún grupo</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {miembro.grupos.map((grupo) => (
+                    <Badge 
+                      key={grupo.uuid} 
+                      variant="secondary"
+                      className="px-3 py-1"
+                    >
+                      {grupo.nombre}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {miembro.notas && (
             <Card className="border-none shadow-md">
               <CardHeader>
@@ -300,6 +346,39 @@ const MiembroDetalle = () => {
           </Card>
         </div>
       </div>
+
+      {/* Modal para mostrar foto */}
+      <Dialog open={showFoto} onOpenChange={setShowFoto}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Foto de {miembro.nombres} {miembro.apellidos}
+            </DialogTitle>
+            <DialogDescription>
+              Vista previa de la fotografía del miembro
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center items-center p-4">
+            {miembro.foto_url ? (
+              <img
+                src={miembro.foto_url}
+                alt={`${miembro.nombres} ${miembro.apellidos}`}
+                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                onError={(e) => {
+                  console.error('Error cargando imagen:', miembro.foto_url);
+                  toast.error(`Error al cargar la imagen. URL: ${miembro.foto_url}`);
+                  setShowFoto(false);
+                }}
+                onLoad={() => {
+                  console.log('Imagen cargada exitosamente:', miembro.foto_url);
+                }}
+              />
+            ) : (
+              <p className="text-gray-500">No hay URL de foto disponible</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

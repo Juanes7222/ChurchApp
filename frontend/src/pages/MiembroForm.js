@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Button } from '../components/ui/button';
@@ -18,6 +18,10 @@ const MiembroForm = () => {
   const isEdit = !!id;
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEdit);
+  const [grupos, setGrupos] = useState([]);
+  const [selectedGrupos, setSelectedGrupos] = useState([]);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
+  const [originalGrupos, setOriginalGrupos] = useState([]); // Grupos originales del miembro
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm({
     defaultValues: {
@@ -35,6 +39,7 @@ const MiembroForm = () => {
       otra_iglesia: false,
       notas: '',
       public_profile: false,
+      foto_url: '',
     }
   });
 
@@ -42,10 +47,21 @@ const MiembroForm = () => {
   const publicProfile = watch('public_profile');
 
   useEffect(() => {
+    loadGrupos();
     if (isEdit) {
       loadMiembro();
     }
-  }, [id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isEdit]);
+
+  const loadGrupos = async () => {
+    try {
+      const response = await api.get('/grupos');
+      setGrupos(response.data.grupos || []);
+    } catch (error) {
+      console.error('Error loading grupos:', error);
+    }
+  };
 
   const loadMiembro = async () => {
     try {
@@ -57,6 +73,13 @@ const MiembroForm = () => {
           setValue(key, miembro[key]);
         }
       });
+
+      // Cargar grupos del miembro
+      if (miembro.grupos && Array.isArray(miembro.grupos)) {
+        const grupoUuids = miembro.grupos.map(g => g.uuid);
+        setSelectedGrupos(grupoUuids);
+        setOriginalGrupos(grupoUuids); // Guardar grupos originales
+      }
     } catch (error) {
       console.error('Error loading member:', error);
       toast.error('Error al cargar miembro');
@@ -69,19 +92,125 @@ const MiembroForm = () => {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
+      // Clean up data - convert empty strings to null for optional fields
+      const cleanedData = {
+        ...data,
+        email: data.email?.trim() || null,
+        telefono: data.telefono?.trim() || null,
+        direccion: data.direccion?.trim() || null,
+        lugar_nac: data.lugar_nac?.trim() || null,
+        llamado: data.llamado?.trim() || null,
+        notas: data.notas?.trim() || null,
+        fecha_nac: data.fecha_nac || null,
+        genero: data.genero || null,
+        foto_url: data.foto_url?.trim() || null,
+      };
+      
+      let miembroUuid = id;
+      
       if (isEdit) {
-        await api.put(`/miembros/${id}`, data);
+        await api.put(`/miembros/${id}`, cleanedData);
         toast.success('Miembro actualizado exitosamente');
       } else {
-        await api.post('/miembros', data);
+        const response = await api.post('/miembros', cleanedData);
+        miembroUuid = response.data.uuid;
         toast.success('Miembro creado exitosamente');
       }
+
+      // Gestionar grupos (agregar nuevos y remover deseleccionados)
+      if (miembroUuid) {
+        // Calcular diferencias entre grupos originales y seleccionados
+        const gruposToAdd = selectedGrupos.filter(g => !originalGrupos.includes(g));
+        const gruposToRemove = originalGrupos.filter(g => !selectedGrupos.includes(g));
+        
+        // Agregar nuevos grupos
+        for (const grupoUuid of gruposToAdd) {
+          try {
+            await api.post(`/grupos/${grupoUuid}/miembros/${miembroUuid}`);
+          } catch (error) {
+            console.error(`Error asignando grupo ${grupoUuid}:`, error);
+            toast.error(`No se pudo asignar uno de los grupos`);
+          }
+        }
+        
+        // Remover grupos deseleccionados (solo en edición)
+        if (isEdit) {
+          for (const grupoUuid of gruposToRemove) {
+            try {
+              await api.delete(`/grupos/${grupoUuid}/miembros/${miembroUuid}`);
+            } catch (error) {
+              console.error(`Error removiendo grupo ${grupoUuid}:`, error);
+              toast.error(`No se pudo remover uno de los grupos`);
+            }
+          }
+        }
+      }
+
       navigate('/miembros');
     } catch (error) {
       console.error('Error saving member:', error);
-      toast.error(error.response?.data?.detail || 'Error al guardar miembro');
+      
+      // Better error handling for validation errors
+      let errorMessage = 'Error al guardar miembro';
+      
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        
+        // If detail is an array of validation errors
+        if (Array.isArray(detail)) {
+          errorMessage = detail.map(err => {
+            const field = err.loc?.[err.loc.length - 1] || '';
+            const msg = err.msg || '';
+            return field ? `${field}: ${msg}` : msg;
+          }).join(', ');
+        } else if (typeof detail === 'string') {
+          errorMessage = detail;
+        } else if (typeof detail === 'object') {
+          errorMessage = JSON.stringify(detail);
+        }
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Tipo de archivo no permitido. Use JPG, PNG, WEBP o GIF');
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Archivo muy grande. Máximo 5MB');
+      return;
+    }
+
+    setUploadingFoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await api.post('/miembros/upload-foto', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      setValue('foto_url', response.data.url);
+      toast.success('Foto subida exitosamente');
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      toast.error(error.response?.data?.detail || 'Error al subir foto');
+    } finally {
+      setUploadingFoto(false);
     }
   };
 
@@ -201,6 +330,65 @@ const MiembroForm = () => {
                 </Select>
               </div>
             </div>
+
+            <div className="pt-4 border-t">
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-base font-semibold">Foto del Miembro</Label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {watch('foto_url') ? 'Foto configurada' : 'Sube una foto directamente'}
+                  </p>
+                </div>
+
+                {!watch('foto_url') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="foto_file">Subir Foto</Label>
+                    <Input
+                      id="foto_file"
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                      onChange={handleFileUpload}
+                      disabled={uploadingFoto}
+                      className="cursor-pointer"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Formatos: JPG, PNG, WEBP, GIF • Máximo: 5MB
+                    </p>
+                    {uploadingFoto && (
+                      <p className="text-sm text-blue-600 flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Subiendo foto...
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {watch('foto_url') && (
+                  <div className="mt-3">
+                    <Label className="text-sm mb-2 block">Foto del miembro:</Label>
+                    <div className="relative inline-block">
+                      <img
+                        src={watch('foto_url')}
+                        alt="Vista previa"
+                        className="w-32 h-32 object-cover rounded-lg border-2 border-gray-200"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute -top-2 -right-2"
+                        onClick={() => setValue('foto_url', '')}
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -265,6 +453,39 @@ const MiembroForm = () => {
             <CardTitle>Información Adicional</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label>Grupos</Label>
+              <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
+                {grupos.length === 0 ? (
+                  <p className="text-sm text-gray-500">No hay grupos disponibles</p>
+                ) : (
+                  grupos.map((grupo) => (
+                    <label
+                      key={grupo.uuid}
+                      className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedGrupos.includes(grupo.uuid)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedGrupos([...selectedGrupos, grupo.uuid]);
+                          } else {
+                            setSelectedGrupos(selectedGrupos.filter(g => g !== grupo.uuid));
+                          }
+                        }}
+                        className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                      />
+                      <span className="text-sm">{grupo.nombre}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {selectedGrupos.length} grupo(s) seleccionado(s)
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="notas">Notas</Label>
               <Textarea

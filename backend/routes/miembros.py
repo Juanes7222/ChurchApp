@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from models.models import MiembroCreate, MiembroUpdate, MiembroResponse
 from utils import require_auth_user, require_admin
 from utils.auth import require_any_authenticated
@@ -6,6 +6,7 @@ from core import config
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 import uuid
+import os
 
 supabase = config.supabase
 api_router = APIRouter(prefix="")
@@ -43,10 +44,19 @@ async def list_miembros(
 @api_router.get("/miembros/{miembro_uuid}", response_model=MiembroResponse)
 async def get_miembro(miembro_uuid: str, current_user: Dict[str, Any] = Depends(require_auth_user)):
     """Get member by UUID"""
-    result = supabase.table('miembros').select('*').eq('uuid', miembro_uuid).execute()
+    result = supabase.table('miembros').select('*, grupos:grupo_miembro(grupo_uuid, grupos(*))').eq('uuid', miembro_uuid).execute()
     if not result.data:
         raise HTTPException(status_code=404, detail="Miembro no encontrado")
-    return result.data[0]
+    
+    miembro = result.data[0]
+    
+    # Transform grupos relationship
+    if miembro.get('grupos'):
+        miembro['grupos'] = [g['grupos'] for g in miembro['grupos'] if g.get('grupos')]
+    else:
+        miembro['grupos'] = []
+    
+    return miembro
 
 @api_router.post("/miembros", response_model=MiembroResponse)
 async def create_miembro(miembro: MiembroCreate, current_user: Dict[str, Any] = Depends(require_auth_user)):
@@ -57,11 +67,14 @@ async def create_miembro(miembro: MiembroCreate, current_user: Dict[str, Any] = 
         raise HTTPException(status_code=409, detail="Ya existe un miembro con este documento")
     
     data = miembro.model_dump()
+    print(f"DEBUG - Data to insert: {data}")  # Debug log
+    print(f"DEBUG - foto_url: {data.get('foto_url')}")  # Debug log
     data['uuid'] = str(uuid.uuid4())  # Generar UUID
     data['created_by'] = current_user['sub']
     data['updated_by'] = current_user['sub']
     
     result = supabase.table('miembros').insert(data).execute()
+    print(f"DEBUG - Inserted data: {result.data[0]}")  # Debug log
     return result.data[0]
 
 @api_router.put("/miembros/{miembro_uuid}", response_model=MiembroResponse)
@@ -77,9 +90,12 @@ async def update_miembro(
         raise HTTPException(status_code=404, detail="Miembro no encontrado")
     
     data = miembro.model_dump(exclude_unset=True)
+    print(f"DEBUG - Data to update: {data}")  # Debug log
+    print(f"DEBUG - foto_url: {data.get('foto_url')}")  # Debug log
     data['updated_by'] = current_user['sub']
     
     result = supabase.table('miembros').update(data).eq('uuid', miembro_uuid).execute()
+    print(f"DEBUG - Updated data: {result.data[0]}")  # Debug log
     return result.data[0]
 
 @api_router.delete("/miembros/{miembro_uuid}")
@@ -204,3 +220,65 @@ async def rechazar_miembro_temporal(
     return {
         "message": "Cliente temporal rechazado y eliminado"
     }
+
+@api_router.post("/miembros/upload-foto")
+async def upload_foto_miembro(
+    file: UploadFile = File(...),
+    current_user: Dict[str, Any] = Depends(require_auth_user)
+):
+    """Upload member photo to Supabase Storage"""
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Tipo de archivo no permitido. Use JPG, PNG, WEBP o GIF")
+    
+    # Validate file size (max 5MB)
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Archivo muy grande. Máximo 5MB")
+    
+    # Generate unique filename
+    file_ext = os.path.splitext(file.filename)[1]
+    unique_filename = f"{uuid.uuid4()}{file_ext}"
+    
+    # Bucket name
+    bucket_name = config.STORAGE_NAME
+    
+    try:
+        # Upload to Supabase Storage
+        result = supabase.storage.from_(bucket_name).upload(
+            path=unique_filename,
+            file=contents,
+            file_options={"content-type": file.content_type}
+        )
+        
+        # Get public URL
+        public_url = supabase.storage.from_(bucket_name).get_public_url(unique_filename)
+        
+        return {
+            "url": public_url,
+            "filename": unique_filename
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al subir archivo: {str(e)}")
+
+@api_router.get("/miembros/storage-check")
+async def check_storage_bucket(current_user: Dict[str, Any] = Depends(require_auth_user)):
+    """Check if storage bucket exists and is accessible"""
+    bucket_name = config.STORAGE_NAME
+    try:
+        # Try to list buckets
+        buckets = supabase.storage.list_buckets()
+        bucket_exists = any(b.name == bucket_name for b in buckets)
+        
+        return {
+            "bucket_name": bucket_name,
+            "exists": bucket_exists,
+            "all_buckets": [b.name for b in buckets]
+        }
+    except Exception as e:
+        return {
+            "bucket_name": bucket_name,
+            "error": str(e),
+            "message": "Error al verificar bucket de storage"
+        }

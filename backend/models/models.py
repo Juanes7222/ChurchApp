@@ -109,6 +109,7 @@ class MiembroResponse(BaseModel):
     foto_url: Optional[str]
     created_at: str
     updated_at: str
+    grupos: Optional[list] = []
 
 class ObservacionCreate(BaseModel):
     texto: str

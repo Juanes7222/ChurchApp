@@ -3,6 +3,7 @@ from models.models import ObservacionCreate, ObservacionResponse
 from utils import require_auth_user
 from core import config
 from typing import Dict, Any
+import uuid
 
 supabase = config.supabase
 api_router = APIRouter(prefix="")
@@ -22,6 +23,7 @@ async def create_observacion(
 ):
     """Add observation to member"""
     data = {
+        "uuid": str(uuid.uuid4()),
         "miembro_uuid": miembro_uuid,
         "texto": obs.texto,
         "autor_uuid": current_user['sub']

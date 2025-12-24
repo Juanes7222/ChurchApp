@@ -211,79 +211,99 @@ const POSVentasPage = () => {
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b shadow-sm">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1 sm:gap-3 min-w-0">
             <Button
               variant="ghost"
               size="icon"
               onClick={handleLogout}
               title={meseroSession ? "Cerrar sesión" : "Volver al POS"}
+              className="flex-shrink-0"
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
-            <div>
-              <h1 className="text-xl font-bold">Punto de Venta</h1>
-              <p className="text-sm text-gray-500">
-                Registra y procesa las ventas
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-xl font-bold truncate">POS</h1>
+              <p className="text-xs sm:text-sm text-gray-500 truncate">
+                {currentUserName}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Info del turno */}
-            <div className="hidden sm:flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4 text-gray-500" />
-              <span className="text-gray-600">
-                Turno #{currentShift.numero_shift}
-              </span>
-              <Badge variant="outline" className="bg-green-50">
-                {currentShift.estado}
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+            {/* Info compacta en móvil */}
+            <div className="flex items-center gap-1 text-xs sm:text-sm">
+              <Badge variant="outline" className="bg-green-50 text-xs px-1.5 py-0.5">
+                T{currentShift.numero_shift}
               </Badge>
-            </div>
-
-            {/* Info del vendedor */}
-            <div className="hidden sm:flex items-center gap-2 text-sm">
-              <User className="h-4 w-4 text-gray-500" />
-              <span className="text-gray-600">
-                {currentUserName}
-              </span>
               {meseroSession && (
-                <Badge variant="outline" className="bg-orange-50 text-orange-700">
+                <Badge variant="outline" className="bg-orange-50 text-orange-700 text-xs px-1.5 py-0.5">
                   Mesero
                 </Badge>
               )}
             </div>
 
-            {/* Botón de cerrar sesión para meseros */}
+            {/* Botón de cerrar sesión para meseros - más pequeño en móvil */}
             {meseroSession && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleLogout}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs sm:text-sm px-2 sm:px-3"
               >
-                Cerrar Sesión
+                Salir
               </Button>
             )}
-
-            {/* Botón nuevo ticket */}
-            <Button
-              variant="outline"
-              onClick={handleNewTicket}
-              className="hidden sm:flex"
-            >
-              Nueva Venta
-              <kbd className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 rounded border">
-                Alt+N
-              </kbd>
-            </Button>
           </div>
         </div>
       </header>
 
       {/* Main content */}
       <main className="flex-1 overflow-hidden">
-        <div className="h-full flex flex-col lg:flex-row">
+        {/* Mobile: Tabs para alternar entre catálogo y ticket */}
+        <div className="h-full lg:hidden flex flex-col">
+          <div className="bg-white border-b flex">
+            <button
+              onClick={() => setShowPaymentModal(false)}
+              className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                !showPaymentModal
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Productos
+              <span className="ml-2 text-xs text-gray-400">({currentTicket?.items.length || 0})</span>
+            </button>
+            <button
+              onClick={() => currentTicket?.items.length > 0 && setShowPaymentModal(true)}
+              disabled={!currentTicket || currentTicket.items.length === 0}
+              className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                showPaymentModal
+                  ? 'border-green-500 text-green-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Ticket
+              {currentTicket?.total > 0 && (
+                <span className="ml-2 text-xs font-bold">
+                  ${currentTicket.total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                </span>
+              )}
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            {!showPaymentModal ? (
+              <ProductCatalog />
+            ) : (
+              <div className="h-full bg-white">
+                <TicketPanel onOpenPayment={handleOpenPayment} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Desktop: Layout de dos columnas */}
+        <div className="hidden lg:flex h-full">
           {/* Catálogo de productos - 60% en desktop */}
           <div className="flex-1 lg:w-[60%] overflow-hidden border-r">
             <ProductCatalog />

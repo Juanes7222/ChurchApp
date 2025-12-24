@@ -220,41 +220,42 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
             Procesar Pago
           </DialogTitle>
-          <DialogDescription>
-            Selecciona el método de pago y confirma la transacción
+          <DialogDescription className="text-xs sm:text-sm">
+            Selecciona el método de pago y confirma
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {/* Total a pagar */}
-          <div className="bg-gray-50 rounded-lg p-4 text-center border-2 border-gray-200">
-            <p className="text-sm text-gray-600 mb-1">Total a Pagar</p>
-            <p className="text-3xl font-bold text-green-600">
+          <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-center border-2 border-gray-200">
+            <p className="text-xs sm:text-sm text-gray-600 mb-1">Total a Pagar</p>
+            <p className="text-2xl sm:text-3xl font-bold text-green-600">
               ${total.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
             </p>
           </div>
 
           {/* Selector de miembro */}
           <div>
-            <Label htmlFor="search-miembro" className="mb-2 block text-red-600">
+            <Label htmlFor="search-miembro" className="mb-2 block text-red-600 text-xs sm:text-sm">
               * Miembro (Obligatorio)
             </Label>
             {selectedMiembro ? (
-              <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div>
-                  <p className="font-medium">{selectedMiembro.nombres} {selectedMiembro.apellidos}</p>
-                  <p className="text-sm text-gray-600">Doc: {selectedMiembro.documento}</p>
+              <div className="flex items-center justify-between p-2 sm:p-3 bg-green-50 border border-green-200 rounded-lg gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm sm:text-base truncate">{selectedMiembro.nombres} {selectedMiembro.apellidos}</p>
+                  <p className="text-xs text-gray-600 truncate">{selectedMiembro.documento}</p>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setSelectedMiembro(null)}
+                  className="text-red-600 hover:text-red-700 flex-shrink-0 h-8 px-2"
                 >
                   Cambiar
                 </Button>
@@ -329,7 +330,7 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
           {!isFiado && (
             <>
               <div>
-                <Label className="mb-2 block">Método de Pago</Label>
+                <Label className="mb-2 block text-xs sm:text-sm">Método de Pago</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {paymentMethods.map((method) => {
                     const Icon = method.icon;
@@ -338,11 +339,11 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
                         key={method.id}
                         variant={selectedMethod === method.id ? 'default' : 'outline'}
                         onClick={() => setSelectedMethod(method.id)}
-                        className={`h-20 flex flex-col gap-2 ${
+                        className={`h-16 sm:h-20 flex flex-col gap-1 sm:gap-2 ${
                           selectedMethod === method.id ? method.color : ''
                         }`}
                       >
-                        <Icon className="h-6 w-6" />
+                        <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
                         <span className="text-xs">{method.name}</span>
                       </Button>
                     );
@@ -354,11 +355,11 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
 
           {/* Campos según método */}
           {selectedMethod === 'efectivo' && (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               <div>
-                <Label htmlFor="monto-recibido">Monto Recibido</Label>
+                <Label htmlFor="monto-recibido" className="text-xs sm:text-sm">Monto Recibido</Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-base sm:text-lg">
                     $
                   </span>
                   <Input
@@ -367,7 +368,7 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
                     placeholder="0"
                     value={montoRecibido}
                     onChange={(e) => setMontoRecibido(e.target.value)}
-                    className="pl-7 text-lg font-medium"
+                    className="pl-7 text-base sm:text-lg font-medium h-11 sm:h-12"
                     autoFocus
                   />
                 </div>
@@ -375,14 +376,14 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
 
               {/* Vuelto */}
               {montoRecibido && (
-                <div className={`p-3 rounded-lg border-2 ${
+                <div className={`p-2 sm:p-3 rounded-lg border-2 ${
                   vuelto >= 0 ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
                 }`}>
                   <div className="flex items-center justify-between">
-                    <span className="font-medium">
+                    <span className="font-medium text-sm sm:text-base">
                       {vuelto >= 0 ? 'Vuelto:' : 'Falta:'}
                     </span>
-                    <span className={`text-xl font-bold ${
+                    <span className={`text-lg sm:text-xl font-bold ${
                       vuelto >= 0 ? 'text-green-700' : 'text-red-700'
                     }`}>
                       ${Math.abs(vuelto).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
@@ -392,16 +393,16 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
               )}
 
               {/* Botones rápidos */}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-5 gap-1 sm:gap-2">
                 {[2000, 5000, 10000, 20000, 50000].map((amount) => (
                   <Button
                     key={amount}
                     variant="outline"
                     size="sm"
                     onClick={() => setMontoRecibido(String(amount))}
-                    className="text-xs"
+                    className="text-xs h-8 px-1"
                   >
-                    +{amount/1000}k
+                    {amount >= 1000 ? `${amount/1000}k` : amount}
                   </Button>
                 ))}
               </div>
@@ -450,25 +451,25 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
             <Button
               variant="outline"
               onClick={onClose}
-              className="flex-1"
+              className="flex-1 h-10 sm:h-auto"
               disabled={isPending}
             >
               Cancelar
             </Button>
             <Button
               onClick={handleConfirmPayment}
-              className="flex-1 bg-green-600 hover:bg-green-700"
+              className="flex-1 bg-green-600 hover:bg-green-700 h-10 sm:h-auto"
               disabled={isPending}
             >
               {isPending ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                  Procesando...
+                  <span className="text-sm sm:text-base">Procesando...</span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Confirmar Pago
+                  <span className="text-sm sm:text-base">Confirmar</span>
                 </>
               )}
             </Button>

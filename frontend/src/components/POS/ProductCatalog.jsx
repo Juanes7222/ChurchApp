@@ -77,46 +77,46 @@ const ProductCatalog = () => {
   }
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardContent className="p-4 flex-1 flex flex-col">
+    <Card className="h-full flex flex-col rounded-none sm:rounded-lg border-0 sm:border">
+      <CardContent className="p-2 sm:p-4 flex-1 flex flex-col">
         {/* Búsqueda */}
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <div className="relative mb-3 sm:mb-4">
+          <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             id="product-search"
             type="text"
-            placeholder="Buscar productos... (Alt+F)"
+            placeholder="Buscar..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-8 sm:pl-10 text-sm h-9 sm:h-10"
           />
         </div>
 
         {/* Tabs de categorías */}
         <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="flex-1 flex flex-col">
-          <TabsList className="w-full justify-start overflow-x-auto">
-            <TabsTrigger value="favoritos" className="gap-2">
-              <Star className="h-4 w-4" />
-              Favoritos
+          <TabsList className="w-full justify-start overflow-x-auto h-auto flex-wrap sm:flex-nowrap gap-1 p-1">
+            <TabsTrigger value="favoritos" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2">
+              <Star className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Favoritos</span>
             </TabsTrigger>
-            <TabsTrigger value="todos">Todos</TabsTrigger>
+            <TabsTrigger value="todos" className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2">Todos</TabsTrigger>
             {categorias.map((cat) => (
-              <TabsTrigger key={cat.uuid} value={cat.uuid}>
+              <TabsTrigger key={cat.uuid} value={cat.uuid} className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 whitespace-nowrap">
                 {cat.nombre}
               </TabsTrigger>
             ))}
           </TabsList>
 
           {/* Favoritos */}
-          <TabsContent value="favoritos" className="flex-1 mt-4">
-            <ScrollArea className="h-[calc(100vh-300px)]">
+          <TabsContent value="favoritos" className="flex-1 mt-2 sm:mt-4">
+            <ScrollArea className="h-[calc(100vh-240px)] sm:h-[calc(100vh-300px)]">
               {productosFavoritos.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  <Star className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                  <p>No hay productos favoritos</p>
+                  <Star className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 opacity-20" />
+                  <p className="text-xs sm:text-sm">No hay productos favoritos</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                   {productosFavoritos.map((producto) => (
                     <ProductCard
                       key={producto.uuid}
@@ -130,19 +130,19 @@ const ProductCatalog = () => {
           </TabsContent>
 
           {/* Todos */}
-          <TabsContent value="todos" className="flex-1 mt-4">
-            <ScrollArea className="h-[calc(100vh-300px)]">
+          <TabsContent value="todos" className="flex-1 mt-2 sm:mt-4">
+            <ScrollArea className="h-[calc(100vh-240px)] sm:h-[calc(100vh-300px)]">
               {loadingProductos ? (
                 <div className="flex justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
               ) : productos.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                  <p>No se encontraron productos</p>
+                  <Package className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 opacity-20" />
+                  <p className="text-xs sm:text-sm">No se encontraron productos</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                   {productos.map((producto) => (
                     <ProductCard
                       key={producto.uuid}
@@ -157,19 +157,19 @@ const ProductCatalog = () => {
 
           {/* Categorías */}
           {categorias.map((categoria) => (
-            <TabsContent key={categoria.uuid} value={categoria.uuid} className="flex-1 mt-4">
-              <ScrollArea className="h-[calc(100vh-300px)]">
+            <TabsContent key={categoria.uuid} value={categoria.uuid} className="flex-1 mt-2 sm:mt-4">
+              <ScrollArea className="h-[calc(100vh-240px)] sm:h-[calc(100vh-300px)]">
                 {loadingProductos ? (
                   <div className="flex justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   </div>
                 ) : productos.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                    <p>No hay productos en esta categoría</p>
+                    <Package className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 opacity-20" />
+                    <p className="text-xs sm:text-sm">No hay productos en esta categoría</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                     {productos.map((producto) => (
                       <ProductCard
                         key={producto.uuid}
@@ -196,14 +196,14 @@ const ProductCard = memo(({ producto, onClick }) => {
     <Button
       variant="outline"
       onClick={onClick}
-      className="h-auto p-4 flex flex-col items-start gap-2 hover:bg-green-50 hover:border-green-500 transition-all"
+      className="h-auto p-2 sm:p-3 flex flex-col items-start gap-1 sm:gap-2 hover:bg-green-50 hover:border-green-500 transition-all"
     >
-      <div className="w-full flex items-start justify-between">
-        <span className="font-medium text-left line-clamp-2 flex-1">
+      <div className="w-full flex items-start justify-between gap-1">
+        <span className="font-medium text-left line-clamp-2 flex-1 text-xs sm:text-sm">
           {producto.nombre}
         </span>
         {producto.favorito && (
-          <Star className="h-4 w-4 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-1" />
+          <Star className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
         )}
       </div>
       
@@ -214,7 +214,7 @@ const ProductCard = memo(({ producto, onClick }) => {
       )}
       
       <div className="w-full text-left">
-        <span className="text-lg font-bold text-green-600">
+        <span className="text-sm sm:text-lg font-bold text-green-600">
           ${parseFloat(producto.precio).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
         </span>
       </div>

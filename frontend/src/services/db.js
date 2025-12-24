@@ -217,7 +217,7 @@ class POSDatabase extends Dexie {
     await this.categorias.clear();
     await this.shifts.clear();
     await this.usuarios_temp.clear();
-    console.log('Cache cleared');
+    ('Cache cleared');
   }
 
   async getStorageStats() {

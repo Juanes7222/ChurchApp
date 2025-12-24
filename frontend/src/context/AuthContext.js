@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
 import { auth, signInWithGoogle, signOut as firebaseSignOut } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import api from '../lib/api';
@@ -34,7 +34,8 @@ export const AuthProvider = ({ children }) => {
           
           if (existingToken && existingUser) {
             // Token exists, just load user data
-            setUser(JSON.parse(existingUser));
+            const parsedUser = JSON.parse(existingUser);
+            setUser(parsedUser);
           } else {
             // No token or user data, verify with backend
             const response = await api.post('/auth/google', {
@@ -69,7 +70,7 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = useCallback(async () => {
     try {
       const result = await signInWithGoogle();
       // The onAuthStateChanged listener will handle the rest
@@ -78,16 +79,16 @@ export const AuthProvider = ({ children }) => {
       console.error('Error signing in with Google:', error);
       throw error;
     }
-  };
+  }, []);
 
-  const login = async (token, userData) => {
+  const login = useCallback(async (token, userData) => {
     // Keep this method for backwards compatibility
     localStorage.setItem('auth_token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await firebaseSignOut();
       localStorage.removeItem('auth_token');
@@ -100,10 +101,16 @@ export const AuthProvider = ({ children }) => {
       console.error('Error signing out:', error);
       throw error;
     }
-  };
+  }, []);
+
+  // Memoizar el valor del contexto para evitar re-renders innecesarios
+  const value = useMemo(
+    () => ({ user, firebaseUser, loading, loginWithGoogle, login, logout }),
+    [user, firebaseUser, loading, loginWithGoogle, login, logout]
+  );
 
   return (
-    <AuthContext.Provider value={{ user, firebaseUser, loading, loginWithGoogle, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

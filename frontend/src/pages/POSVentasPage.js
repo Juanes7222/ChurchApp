@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProductCatalog from '../components/POS/ProductCatalog';
 import TicketPanel from '../components/POS/TicketPanel';
@@ -21,7 +21,7 @@ import { toast } from 'sonner';
  * Combina el catálogo de productos y el panel del ticket
  */
 const POSVentasPage = () => {
-  console.log('POSVentasPage: Component mounted');
+  ('POSVentasPage: Component mounted');
   const navigate = useNavigate();
   const { user } = useAuth();
   
@@ -52,9 +52,9 @@ const POSVentasPage = () => {
   // Cargar turno activo al montar SIEMPRE
   useEffect(() => {
     const checkShift = async () => {
-      console.log('POSVentasPage: Checking active shift...');
+      ('POSVentasPage: Checking active shift...');
       const shift = await loadActiveShift();
-      console.log('POSVentasPage: Active shift result:', shift);
+      ('POSVentasPage: Active shift result:', shift);
       setShiftChecked(true);
     };
     checkShift();
@@ -80,19 +80,22 @@ const POSVentasPage = () => {
           nombre: userData.nombre || user.email,
           tipo: 'admin'
         };
-        console.log('Inicializando vendedor admin:', adminVendedor);
+        ('Inicializando vendedor admin:', adminVendedor);
         initializeShift(currentShift, adminVendedor);
       }
     }
   }, [meseroSession, user, vendedor, currentShift, initializeShift]);
   
-  // Nombre del usuario actual (Firebase o mesero)
-  const currentUserName = meseroSession?.display_name || vendedor?.nombre || user?.email || 'Sin vendedor';
+  // Nombre del usuario actual (Firebase o mesero) - Memoizado
+  const currentUserName = useMemo(
+    () => meseroSession?.display_name || vendedor?.nombre || user?.email || 'Sin vendedor',
+    [meseroSession?.display_name, vendedor?.nombre, user?.email]
+  );
 
   // Verificar que hay turno activo (solo después de haber chequeado)
   useEffect(() => {
     if (shiftChecked && !currentShift) {
-      console.log('POSVentasPage: No active shift, redirecting...');
+      ('POSVentasPage: No active shift, redirecting...');
       toast.error('No hay turno activo', {
         description: 'Debes abrir un turno antes de realizar ventas',
       });

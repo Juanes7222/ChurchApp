@@ -114,7 +114,7 @@ const POSTurnos = () => {
       queryClient.invalidateQueries({ queryKey: ['caja-shifts'] });
       queryClient.invalidateQueries({ queryKey: ['active-shift'] });
 
-      console.log('Turno abierto:', user, data);
+      ('Turno abierto:', user, data);
       
       // Recargar turno activo del backend para asegurar sincronización
       await loadActiveShift();

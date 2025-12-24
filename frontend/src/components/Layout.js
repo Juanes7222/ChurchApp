@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { CanAccessSection } from './PermissionGuard';
@@ -24,13 +24,51 @@ const Layout = () => {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout();
     toast.success('Sesión cerrada');
     navigate('/login');
-  };
+  }, [logout, navigate]);
 
-  const isActive = (href) => location.pathname === href || location.pathname.startsWith(href + '/');
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  const openSidebar = useCallback(() => setSidebarOpen(true), []);
+
+  const isActive = useCallback(
+    (href) => location.pathname === href || location.pathname.startsWith(href + '/'),
+    [location.pathname]
+  );
+
+  // Memoizar el cálculo de las clases CSS para los links
+  const getLinkClassName = useCallback((path) => {
+    return `flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
+      isActive(path)
+        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' 
+        : 'text-gray-700 hover:bg-gray-100'
+    }`;
+  }, [isActive]);
+
+  const getPOSLinkClassName = useCallback((path) => {
+    return `flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
+      isActive(path)
+        ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md' 
+        : 'text-gray-700 hover:bg-gray-100'
+    }`;
+  }, [isActive]);
+
+  // Memoizar el avatar inicial
+  const avatarFallback = useMemo(() => {
+    return user?.name?.[0] || user?.email?.[0] || 'U';
+  }, [user?.name, user?.email]);
+
+  // Memoizar el nombre a mostrar
+  const displayName = useMemo(() => {
+    return user?.name || user?.email;
+  }, [user?.name, user?.email]);
+
+  // Memoizar el rol formateado
+  const formattedRole = useMemo(() => {
+    return user?.role?.replace('_', ' ');
+  }, [user?.role]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -38,7 +76,7 @@ const Layout = () => {
       {sidebarOpen && (
         <div 
           className="fixed inset-0 bg-gray-900/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeSidebar}
         />
       )}
 
@@ -63,7 +101,7 @@ const Layout = () => {
               </span>
             </Link>
             <button
-              onClick={() => setSidebarOpen(false)}
+              onClick={closeSidebar}
               className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
             >
               <X className="h-5 w-5" />
@@ -76,15 +114,9 @@ const Layout = () => {
             <CanAccessSection section="dashboard">
               <Link
                 to="/dashboard"
-                onClick={() => setSidebarOpen(false)}
+                onClick={closeSidebar}
                 data-testid="nav-dashboard"
-                className={`
-                  flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all
-                  ${isActive('/dashboard')
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                  }
-                `}
+                className={getLinkClassName('/dashboard')}
               >
                 <LayoutDashboard className="h-5 w-5" />
                 <span>Dashboard</span>
@@ -95,72 +127,46 @@ const Layout = () => {
             <CanAccessSection section="miembros">
               <Link
                 to="/miembros"
-                onClick={() => setSidebarOpen(false)}
+                onClick={closeSidebar}
                 data-testid="nav-miembros"
-                className={`
-                  flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all
-                  ${isActive('/miembros')
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                  }
-                `}
+                className={getLinkClassName('/miembros')}
               >
                 <Users className="h-5 w-5" />
                 <span>Miembros</span>
               </Link>
             </CanAccessSection>
-
             {/* Grupos - Solo admin, pastor, secretaria */}
             <CanAccessSection section="grupos">
               <Link
                 to="/grupos"
-                onClick={() => setSidebarOpen(false)}
+                onClick={closeSidebar}
                 data-testid="nav-grupos"
-                className={`
-                  flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all
-                  ${isActive('/grupos')
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                  }
-                `}
+                className={getLinkClassName('/grupos')}
               >
                 <UsersRound className="h-5 w-5" />
                 <span>Grupos</span>
               </Link>
             </CanAccessSection>
-
             {/* POS/Restaurante - Solo agente_restaurante, ayudante_restaurante, admin */}
             <CanAccessSection section="pos">
               <Link
                 to="/pos"
-                onClick={() => setSidebarOpen(false)}
+                onClick={closeSidebar}
                 data-testid="nav-pos"
-                className={`
-                  flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all
-                  ${isActive('/pos')
-                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                  }
-                `}
+                className={getPOSLinkClassName('/pos')}
               >
                 <ShoppingCart className="h-5 w-5" />
                 <span>Restaurante</span>
               </Link>
             </CanAccessSection>
 
-            {/* Admin - Solo admin y TI */}
+            {/* Admin - Solo admin */}
             <CanAccessSection section="admin">
               <Link
                 to="/admin"
-                onClick={() => setSidebarOpen(false)}
+                onClick={closeSidebar}
                 data-testid="nav-admin"
-                className={`
-                  flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all
-                  ${isActive('/admin')
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                  }
-                `}
+                className={getLinkClassName('/admin')}
               >
                 <Shield className="h-5 w-5" />
                 <span>Administración</span>
@@ -168,32 +174,32 @@ const Layout = () => {
             </CanAccessSection>
           </nav>
 
-          {/* User section */}
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex items-center gap-3 mb-3">
-              <Avatar className="h-10 w-10">
+          {/* User profile */}
+          <div className="p-4 border-t border-gray-200 space-y-3">
+            <div className="flex items-center gap-3 px-2">
+              <Avatar>
                 <AvatarImage src={user?.picture} />
                 <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white">
-                  {user?.name?.[0] || user?.email?.[0] || 'U'}
+                  {avatarFallback}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {user?.name || user?.email}
+                  {displayName}
                 </p>
                 <p className="text-xs text-gray-600 capitalize">
-                  {user?.role?.replace('_', ' ')}
+                  {formattedRole}
                 </p>
               </div>
             </div>
             <Button
-              variant="outline"
+              variant="ghost"
+              size="sm"
               onClick={handleLogout}
-              className="w-full justify-start gap-2"
-              data-testid="logout-button"
+              className="w-full justify-start text-gray-700 hover:text-red-600 hover:bg-red-50"
             >
-              <LogOut className="h-4 w-4" />
-              Cerrar Sesión
+              <LogOut className="h-4 w-4 mr-2" />
+              Cerrar sesión
             </Button>
           </div>
         </div>
@@ -204,7 +210,7 @@ const Layout = () => {
         {/* Mobile header */}
         <header className="lg:hidden sticky top-0 z-30 h-16 bg-white border-b border-gray-200 px-4 flex items-center justify-between shadow-sm">
           <button
-            onClick={() => setSidebarOpen(true)}
+            onClick={openSidebar}
             className="p-2 rounded-lg hover:bg-gray-100"
             data-testid="mobile-menu-button"
           >

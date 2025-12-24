@@ -77,7 +77,7 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
           const response = await api.get('/miembros', {
             params: { q: searchMiembro, page_size: 10 }
           });
-          console.log('Miembros encontrados:', response.data.miembros);
+          ('Miembros encontrados:', response.data.miembros);
           setMiembros(response.data.miembros || []);
         } catch (error) {
           console.error('Error buscando miembros:', error);
@@ -210,7 +210,7 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
       }],
     };
 
-    console.log('Enviando venta:', JSON.stringify(ventaData, null, 2));
+    ('Enviando venta:', JSON.stringify(ventaData, null, 2));
 
     // Enviar a la API
     procesarVenta(ventaData);
@@ -284,7 +284,7 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
                         key={miembro.uuid}
                         className="w-full text-left p-2 hover:bg-gray-100 border-b last:border-b-0"
                         onClick={() => {
-                          console.log('Miembro seleccionado:', miembro);
+                          ('Miembro seleccionado:', miembro);
                           setSelectedMiembro(miembro);
                           setSearchMiembro('');
                           setMiembros([]);
@@ -484,7 +484,7 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
         open={showRegistroTemporal}
         onOpenChange={setShowRegistroTemporal}
         onClienteCreado={(nuevoCliente) => {
-          console.log('Cliente temporal creado:', nuevoCliente);
+          ('Cliente temporal creado:', nuevoCliente);
           setSelectedMiembro(nuevoCliente);
           toast.info('Cliente registrado temporalmente', {
             description: 'Requiere verificación de administrador'

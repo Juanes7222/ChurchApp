@@ -150,20 +150,25 @@ async def get_movimientos_cuenta(
         for mov_data in (movimientos_result.data or []):
             mov = cast(Dict[str, Any], mov_data)
             items.append({
+                'uuid': mov.get('uuid'),
                 'fecha': mov.get('fecha'),
                 'tipo': mov.get('tipo'),
                 'monto': float(mov.get('monto', 0)),
-                'descripcion': mov.get('descripcion')
+                'descripcion': mov.get('descripcion'),
+                'venta_uuid': mov.get('venta_uuid'),
+                'metodo_pago': mov.get('metodo_pago')
             })
         
         for venta_data in (ventas_pagadas_result.data or []):
             venta = cast(Dict[str, Any], venta_data)
             items.append({
+                'uuid': venta.get('uuid'),
                 'fecha': venta.get('created_at'),
                 'tipo': 'venta_pagada',
                 'monto': float(venta.get('total', 0)),
                 'descripcion': f"Venta #{venta.get('numero_ticket')} pagada directamente",
-                'venta_uuid': venta.get('uuid')
+                'venta_uuid': venta.get('uuid'),
+                'numero_ticket': venta.get('numero_ticket')
             })
         
         items.sort(key=lambda x: x.get('fecha', ''), reverse=True)

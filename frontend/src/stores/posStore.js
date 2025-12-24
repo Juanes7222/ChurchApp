@@ -44,14 +44,14 @@ const usePOSStore = create(
         try {
           const api = (await import('../lib/api')).default;
           const response = await api.get('/pos/caja-shifts/activo');
-          console.log(response);
-          console.log('loadActiveShift response:', response.data);
+          (response);
+          ('loadActiveShift response:', response.data);
           if (response.data && response.data.shift) {
-            console.log('Setting currentShift:', response.data.shift);
+            ('Setting currentShift:', response.data.shift);
             set({ currentShift: response.data.shift });
             return response.data.shift;
           } else {
-            console.log('No active shift found');
+            ('No active shift found');
             set({ currentShift: null });
             return null;
           }

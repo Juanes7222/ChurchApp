@@ -23,9 +23,9 @@ const MeseroLogin = () => {
     setLoading(true);
 
     try {
-      console.log('Intentando login mesero:', { username: formData.username });
+      ('Intentando login mesero:', { username: formData.username });
       const response = await api.post('/pos/meseros/login', formData);
-      console.log('Respuesta login mesero:', response.data);
+      ('Respuesta login mesero:', response.data);
       
       const meseroData = response.data;
       

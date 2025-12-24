@@ -20,24 +20,24 @@ class SyncService {
   }
 
   handleOnline() {
-    console.log('🟢 Conexión restaurada');
+    ('🟢 Conexión restaurada');
     usePOSStore.getState().setOnlineStatus(true);
     this.syncAll();
   }
 
   handleOffline() {
-    console.log('🔴 Sin conexión');
+    ('🔴 Sin conexión');
     usePOSStore.getState().setOnlineStatus(false);
   }
 
   async syncAll() {
     if (this.isSyncing) {
-      console.log('⏳ Sincronización ya en progreso');
+      ('⏳ Sincronización ya en progreso');
       return;
     }
 
     if (!navigator.onLine) {
-      console.log('⚠️ Sin conexión - sync cancelado');
+      ('⚠️ Sin conexión - sync cancelado');
       return;
     }
 
@@ -49,12 +49,12 @@ class SyncService {
       const ventasPendientes = await db.getVentasOffline();
       
       if (ventasPendientes.length === 0) {
-        console.log('✅ No hay ventas pendientes de sincronización');
+        ('✅ No hay ventas pendientes de sincronización');
         this.isSyncing = false;
         return;
       }
 
-      console.log(`📤 Sincronizando ${ventasPendientes.length} ventas...`);
+      (`📤 Sincronizando ${ventasPendientes.length} ventas...`);
 
       // Preparar payload para batch sync
       const ventasData = ventasPendientes.map(v => ({
@@ -71,7 +71,7 @@ class SyncService {
       // Enviar al backend
       const result = await syncPushVentas(ventasData);
       
-      console.log('📥 Respuesta del servidor:', result);
+      ('📥 Respuesta del servidor:', result);
 
       // Procesar resultados
       if (result.resultados) {
@@ -96,7 +96,7 @@ class SyncService {
           this.scheduleRetry(fallida.venta.client_ticket_id);
         }
 
-        console.log(`✅ Sync completado: ${result.resultados.exitosas?.length || 0} exitosas, ${result.resultados.fallidas?.length || 0} fallidas`);
+        (`✅ Sync completado: ${result.resultados.exitosas?.length || 0} exitosas, ${result.resultados.fallidas?.length || 0} fallidas`);
       }
 
       // Limpiar items antiguos sincronizados
@@ -108,7 +108,7 @@ class SyncService {
       
       // Si es error de red, programar retry
       if (error.code === 'ERR_NETWORK' || error.message.includes('Network')) {
-        console.log('⚠️ Error de red - reintentando en 30s...');
+        ('⚠️ Error de red - reintentando en 30s...');
         setTimeout(() => this.syncAll(), 30000);
       }
     } finally {
@@ -134,10 +134,10 @@ class SyncService {
     // Calcular delay con backoff exponencial
     const delay = this.baseDelay * Math.pow(2, attempts);
     
-    console.log(`⏰ Retry programado para ${clientTicketId} en ${delay}ms (intento ${attempts + 1}/${this.maxRetries})`);
+    (`⏰ Retry programado para ${clientTicketId} en ${delay}ms (intento ${attempts + 1}/${this.maxRetries})`);
 
     const timeout = setTimeout(async () => {
-      console.log(`🔄 Reintentando ${clientTicketId}...`);
+      (`🔄 Reintentando ${clientTicketId}...`);
       await this.syncAll();
     }, delay);
 
@@ -153,7 +153,7 @@ class SyncService {
       if (navigator.onLine) {
         await this.syncAll();
       } else {
-        console.log('⚠️ Sin conexión - venta guardada para sync posterior');
+        ('⚠️ Sin conexión - venta guardada para sync posterior');
       }
     } catch (error) {
       console.error('❌ Error guardando venta offline:', error);
@@ -162,7 +162,7 @@ class SyncService {
   }
 
   async forceSyncNow() {
-    console.log('🔄 Sincronización manual iniciada');
+    ('🔄 Sincronización manual iniciada');
     return await this.syncAll();
   }
 

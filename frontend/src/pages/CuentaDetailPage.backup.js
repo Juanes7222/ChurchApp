@@ -41,7 +41,9 @@ import {
   FileText,
   Plus,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  Smartphone,
+  Banknote
 } from 'lucide-react';
 
 // API functions
@@ -228,6 +230,61 @@ const CuentaDetailPage = () => {
     }
   };
 
+  const getBadgeContent = (tipo) => {
+    switch (tipo) {
+      case 'cargo':
+        return (
+          <span className="flex items-center gap-1">
+            <ShoppingCart className="h-3 w-3" />
+            COMPRA AL CRÉDITO
+          </span>
+        );
+      case 'pago':
+        return (
+          <span className="flex items-center gap-1">
+            <Banknote className="h-3 w-3" />
+            PAGO
+          </span>
+        );
+      case 'venta_pagada':
+        return (
+          <span className="flex items-center gap-1">
+            <CheckCircle2 className="h-3 w-3" />
+            COMPRA PAGADA
+          </span>
+        );
+      case 'ajuste':
+        return (
+          <span className="flex items-center gap-1">
+            <FileText className="h-3 w-3" />
+            AJUSTE
+          </span>
+        );
+      default:
+        return tipo;
+    }
+  };
+
+  const getMetodoPagoIcon = (metodo) => {
+    if (metodo === 'efectivo') {
+      return (
+        <span className="flex items-center gap-1">
+          <Banknote className="h-3 w-3" />
+          Efectivo
+        </span>
+      );
+    }
+    if (metodo === 'transferencia') {
+      return (
+        <span className="flex items-center gap-1">
+          <Smartphone className="h-3 w-3" />
+          Transferencia
+        </span>
+      );
+    }
+    return metodo;
+  };
+
   const getMiembroNombre = () => {
     const miembro = cuenta?.cuenta?.miembros || {};
     return `${miembro.nombres || ''} ${miembro.apellidos || ''}`.trim() || 'Sin nombre';
@@ -395,7 +452,7 @@ const CuentaDetailPage = () => {
                       movimiento.tipo === 'pago' ? 'bg-green-500' :
                       movimiento.tipo === 'venta_pagada' ? 'bg-emerald-500' :
                       'bg-blue-500'
-                    } shadow-md z-10`}>
+                    } shadow-md z-10`>
                       <div className="absolute inset-0 flex items-center justify-center">
                         {getMovimientoIcon(movimiento.tipo, 'w-3 h-3 text-white')}
                       </div>
@@ -407,23 +464,15 @@ const CuentaDetailPage = () => {
                       movimiento.tipo === 'pago' ? 'border-l-4 border-l-green-500' :
                       movimiento.tipo === 'venta_pagada' ? 'border-l-4 border-l-emerald-500' :
                       'border-l-4 border-l-blue-500'
-                    }`}>
+                    }`>
                       <Accordion type="single" collapsible>
                         <AccordionItem value="detalles" className="border-none">
                           <AccordionTrigger className="px-4 pt-4 pb-2 hover:no-underline">
                             <div className="flex items-start justify-between w-full pr-2">
                               <div className="flex-1 text-left">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <Badge variant={getMovimientoBadgeVariant(movimiento.tipo)} className="text-xs flex items-center gap-1">
-                                    {movimiento.tipo === 'cargo' ? (
-                                      <><ShoppingCart className="h-3 w-3" /> COMPRA AL CRÉDITO</>
-                                    ) : movimiento.tipo === 'pago' ? (
-                                      <><CreditCard className="h-3 w-3" /> PAGO</>
-                                    ) : movimiento.tipo === 'venta_pagada' ? (
-                                      <><CheckCircle2 className="h-3 w-3" /> COMPRA PAGADA</>
-                                    ) : (
-                                      <><FileText className="h-3 w-3" /> AJUSTE</>
-                                    )}
+                                  <Badge variant={getMovimientoBadgeVariant(movimiento.tipo)} className="text-xs">
+                                    {getBadgeContent(movimiento.tipo)}
                                   </Badge>
                                   <span className="text-xs text-gray-500">
                                     {new Date(movimiento.fecha).toLocaleString('es-ES', {
@@ -454,9 +503,13 @@ const CuentaDetailPage = () => {
                           </AccordionTrigger>
                           
                           <AccordionContent className="px-4 pb-4">
-                            {/* Detalles de la compra (para cargos y ventas pagadas con UUID) */}
-                            {(movimiento.tipo === 'cargo' || movimiento.tipo === 'venta_pagada') && movimiento.venta_uuid && (
-                              <VentaDetail ventaUuid={movimiento.venta_uuid} esPagada={movimiento.tipo === 'venta_pagada'} />
+                            {/* Detalles de la compra (si es cargo o venta pagada) */}
+                            {(movimiento.tipo === 'cargo' || movimiento.tipo === 'venta_pagada') && (movimiento.venta_uuid || movimiento.venta_id) && (
+                              <VentaDetail 
+                                key={movimiento.venta_uuid || movimiento.venta_id}
+                                ventaUuid={movimiento.venta_uuid || movimiento.venta_id} 
+                                esPagada={movimiento.tipo === 'venta_pagada'} 
+                              />
                             )}
 
                             {/* Información adicional */}
@@ -466,20 +519,16 @@ const CuentaDetailPage = () => {
                                   <span className="font-mono">
                                     ID: {movimiento.uuid?.slice(0, 8)}
                                   </span>
-                                  {movimiento.numero_ticket && (
+                                  {movimiento.ventas?.numero_ticket && (
                                     <span className="flex items-center gap-1">
                                       <FileText className="h-3 w-3" />
-                                      Ticket #{movimiento.numero_ticket}
+                                      Ticket #{movimiento.ventas.numero_ticket}
                                     </span>
                                   )}
                                 </div>
                                 {movimiento.tipo === 'pago' && movimiento.metodo_pago && (
-                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                    {movimiento.metodo_pago === 'efectivo' ? (
-                                      <><DollarSign className="h-3 w-3" /> Efectivo</>
-                                    ) : movimiento.metodo_pago === 'transferencia' ? (
-                                      <><CreditCard className="h-3 w-3" /> Transferencia</>
-                                    ) : movimiento.metodo_pago}
+                                  <Badge variant="outline" className="text-xs">
+                                    {getMetodoPagoIcon(movimiento.metodo_pago)}
                                   </Badge>
                                 )}
                               </div>
@@ -681,7 +730,7 @@ const CuentaDetailPage = () => {
 
 // Componente auxiliar para mostrar detalles de venta
 const VentaDetail = ({ ventaUuid, esPagada = false }) => {
-  const { data: venta, isLoading } = useQuery({
+  const { data: venta, isLoading, error } = useQuery({
     queryKey: ['venta-detalle', ventaUuid],
     queryFn: () => fetchVentaDetalle(ventaUuid),
     staleTime: 5 * 60 * 1000, // 5 minutos
@@ -695,8 +744,21 @@ const VentaDetail = ({ ventaUuid, esPagada = false }) => {
     );
   }
 
+  if (error) {
+    console.error('Error cargando detalle de venta:', error);
+    return (
+      <div className="text-sm text-red-600 py-2">
+        Error al cargar los detalles de la venta
+      </div>
+    );
+  }
+
   if (!venta || !venta.items) {
-    return null;
+    return (
+      <div className="text-sm text-gray-600 py-2">
+        No hay detalles disponibles para esta venta
+      </div>
+    );
   }
 
   const bgColor = esPagada ? 'from-emerald-50 to-emerald-100' : 'from-gray-50 to-gray-100';

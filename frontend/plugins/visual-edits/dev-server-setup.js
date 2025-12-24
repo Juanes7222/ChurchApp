@@ -269,7 +269,7 @@ function setupDevServer(config) {
                 if (elementName !== change.component) return;
 
                 // FIXED: Conditional processing based on change type
-                console.log(
+                (
                   `[backend] Processing change type: ${change.type || "legacy"} for element: ${elementName}`,
                 );
 
@@ -278,7 +278,7 @@ function setupDevServer(config) {
                   change.className !== undefined
                 ) {
                   // CLASSNAME/TAILWIND PROCESSING
-                  console.log(
+                  (
                     `[backend] Processing className change:`,
                     change.className,
                   );
@@ -295,7 +295,7 @@ function setupDevServer(config) {
 
                   if (classAttr) {
                     // Update existing className
-                    console.log(
+                    (
                       `[backend] Updating existing className from:`,
                       classAttr.value?.value,
                       "to:",
@@ -304,7 +304,7 @@ function setupDevServer(config) {
                     classAttr.value = t.stringLiteral(change.className);
                   } else {
                     // Create new className attribute
-                    console.log(
+                    (
                       `[backend] Creating new className attribute:`,
                       change.className,
                     );
@@ -328,7 +328,7 @@ function setupDevServer(config) {
                   change.type === "textContent" &&
                   change.textContent !== undefined
                 ) {
-                  console.log(
+                  (
                     `[backend] Processing textContent change:`,
                     change.textContent,
                   );
@@ -394,7 +394,7 @@ function setupDevServer(config) {
                   change.content !== undefined
                 ) {
                   // CONTENT-ONLY PROCESSING
-                  console.log(
+                  (
                     `[backend] Processing content-only change:`,
                     change.content.slice(0, 100),
                   );

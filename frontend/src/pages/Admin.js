@@ -24,7 +24,8 @@ const Admin = () => {
     role: 'secretaria',
     email: '',
     expires_days: 7,
-    note: ''
+    note: '',
+    isPermanent: false
   });
 
   useEffect(() => {
@@ -53,9 +54,20 @@ const Admin = () => {
     e.preventDefault();
     setCreating(true);
     try {
-      const response = await api.post('/admin/invites', formData);
+      // Si es permanente, no enviar expires_days
+      const requestData = {
+        role: formData.role,
+        email: formData.email,
+        note: formData.note
+      };
+      
+      if (!formData.isPermanent) {
+        requestData.expires_days = formData.expires_days;
+      }
+      
+      const response = await api.post('/admin/invites', requestData);
       toast.success('Invitación creada exitosamente');
-      setFormData({ role: 'secretaria', email: '', expires_days: 7, note: '' });
+      setFormData({ role: 'secretaria', email: '', expires_days: 7, note: '', isPermanent: false });
       loadInvites();
       
       // Copy invite link
@@ -136,6 +148,159 @@ const Admin = () => {
         </Card>
       </div>
 
+      {/* Matriz de Permisos por Rol */}
+      <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-blue-600" />
+            Sistema de Permisos por Rol
+          </CardTitle>
+          <p className="text-sm text-gray-600 mt-2">
+            Cada rol tiene acceso limitado según su función. Nadie accede a lo que no necesita.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Admin */}
+            <div className="border border-purple-200 bg-white rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Badge className="bg-purple-600">Administrador</Badge>
+                <span className="text-xs text-purple-600 font-semibold">ACCESO TOTAL</span>
+              </div>
+              <p className="text-sm text-gray-700 mb-2">
+                Acceso absoluto a todo el sistema. Solo puede ser creado directamente por el sistema.
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">✓ Gestión completa de miembros</span>
+                <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">✓ Gestión completa de grupos</span>
+                <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">✓ POS completo</span>
+                <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">✓ Administración de usuarios</span>
+                <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">✓ Auditorías</span>
+                <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">✓ Configuraciones</span>
+              </div>
+            </div>
+
+            {/* Pastor */}
+            <div className="border border-green-200 bg-white rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Badge className="bg-green-600">Pastor</Badge>
+                <span className="text-xs text-green-600 font-semibold">LECTURA + USUARIOS</span>
+              </div>
+              <p className="text-sm text-gray-700 mb-2">
+                Acceso de lectura completo. Acompañamiento espiritual sin modificar configuraciones técnicas.
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="bg-green-100 text-green-700 px-2 py-1 rounded">✓ Ver miembros completo</span>
+                <span className="bg-green-100 text-green-700 px-2 py-1 rounded">✓ Ver grupos y liderazgos</span>
+                <span className="bg-green-100 text-green-700 px-2 py-1 rounded">✓ Ver observaciones</span>
+                <span className="bg-green-100 text-green-700 px-2 py-1 rounded">✓ Ver reportes POS</span>
+                <span className="bg-green-100 text-green-700 px-2 py-1 rounded">✓ Ver cuentas (solo lectura)</span>
+                <span className="bg-green-100 text-green-700 px-2 py-1 rounded">✓ Crear/eliminar usuarios</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Modificar configuraciones</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Abrir/cerrar turnos</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Registrar pagos</span>
+              </div>
+            </div>
+
+            {/* Secretaria */}
+            <div className="border border-blue-200 bg-white rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Badge className="bg-blue-600">Secretaria</Badge>
+                <span className="text-xs text-blue-600 font-semibold">OPERATIVO-ADMINISTRATIVO</span>
+              </div>
+              <p className="text-sm text-gray-700 mb-2">
+                Gestión del día a día: miembros, grupos, observaciones y pagos.
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">✓ Crear/editar miembros</span>
+                <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">✓ Gestión de grupos</span>
+                <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">✓ Registrar observaciones</span>
+                <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">✓ Registrar abonos/pagos</span>
+                <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">✓ Consultar reportes</span>
+                <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">✓ Crear/eliminar usuarios</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Abrir/cerrar turnos</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Anular ventas</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Eliminar miembros</span>
+              </div>
+            </div>
+
+            {/* Administrador Restaurante */}
+            <div className="border border-orange-200 bg-white rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Badge className="bg-orange-600">Administrador Restaurante</Badge>
+                <span className="text-xs text-orange-600 font-semibold">POS COMPLETO</span>
+              </div>
+              <p className="text-sm text-gray-700 mb-2">
+                Control total del restaurante: turnos, ventas, cuentas, productos y reportes.
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">✓ Abrir/cerrar turnos</span>
+                <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">✓ Gestión de productos</span>
+                <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">✓ Anular ventas</span>
+                <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">✓ Registrar abonos/ajustes</span>
+                <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">✓ Reportes completos</span>
+                <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">✓ Usuarios temporales</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Ver/editar miembros completos</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Gestión de grupos</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Configuraciones globales</span>
+              </div>
+            </div>
+
+            {/* Líder */}
+            <div className="border border-yellow-200 bg-white rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Badge className="bg-yellow-600">Líder</Badge>
+                <span className="text-xs text-yellow-600 font-semibold">SOLO SU GRUPO (FUTURO)</span>
+              </div>
+              <p className="text-sm text-gray-700 mb-2">
+                Acceso limitado a información básica de los miembros de su grupo únicamente.
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded">✓ Ver info básica de su grupo</span>
+                <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded">✓ Ver fechas relevantes</span>
+                <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded">✓ Ver observaciones públicas</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Ver info financiera</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Editar datos</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Acceder al restaurante</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Ver otros grupos</span>
+              </div>
+            </div>
+
+            {/* Usuario Temporal (Mesero) */}
+            <div className="border border-gray-200 bg-white rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Badge variant="outline">Usuario Temporal (Mesero)</Badge>
+                <span className="text-xs text-gray-600 font-semibold">SOLO DURANTE TURNO</span>
+              </div>
+              <p className="text-sm text-gray-700 mb-2">
+                Acceso temporal solo para registrar ventas mientras el turno está activo.
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">✓ Registrar ventas</span>
+                <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">✓ Seleccionar productos</span>
+                <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">✓ Marcar ventas fiadas</span>
+                <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">✓ Registrar pagos inmediatos</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Ver datos completos de miembros</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Anular ventas</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Ver reportes</span>
+                <span className="bg-red-100 text-red-700 px-2 py-1 rounded">✗ Persiste después del turno</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 className="font-semibold text-blue-900 mb-2">Principios del Sistema de Permisos:</h4>
+            <ul className="text-sm text-blue-800 space-y-1">
+              <li>• <strong>Nadie accede a lo que no necesita</strong> - Mínimo privilegio necesario</li>
+              <li>• <strong>Registros sensibles solo con autorización</strong> - Pastor y Secretaria por invitación</li>
+              <li>• <strong>Acciones críticas auditadas</strong> - Todo cambio importante queda registrado</li>
+              <li>• <strong>Usuarios temporales nunca persisten</strong> - Meseros solo existen durante turnos</li>
+              <li>• <strong>Admin controla todo</strong> - Único rol con acceso absoluto</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="border-none shadow-md">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -156,11 +321,15 @@ const Admin = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Administrador</SelectItem>
                     <SelectItem value="pastor">Pastor</SelectItem>
                     <SelectItem value="secretaria">Secretaria</SelectItem>
+                    <SelectItem value="agente_restaurante">Administrador Restaurante</SelectItem>
+                    <SelectItem value="lider">Líder (futuro)</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Admin solo puede ser creado directamente por el sistema
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -176,16 +345,37 @@ const Admin = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="expires_days">Días de Validez</Label>
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="expires_days">Días de Validez</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="isPermanent"
+                      checked={formData.isPermanent}
+                      onChange={(e) => setFormData({ ...formData, isPermanent: e.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <Label htmlFor="isPermanent" className="text-sm font-normal cursor-pointer">
+                      Permanente (sin expiración)
+                    </Label>
+                  </div>
+                </div>
                 <Input
                   id="expires_days"
                   type="number"
                   min="1"
-                  max="30"
+                  max="365"
                   value={formData.expires_days}
                   onChange={(e) => setFormData({ ...formData, expires_days: parseInt(e.target.value) })}
                   data-testid="input-expires-days"
+                  disabled={formData.isPermanent}
+                  className={formData.isPermanent ? 'bg-gray-100 cursor-not-allowed' : ''}
                 />
+                {formData.isPermanent && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    ✓ Esta invitación no expirará automáticamente
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -252,6 +442,11 @@ const Admin = () => {
                         <Badge variant="outline" className="capitalize">
                           {invite.role}
                         </Badge>
+                        {!invite.expires_at && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
+                            Permanente
+                          </Badge>
+                        )}
                       </div>
                       {invite.email && (
                         <p className="text-sm text-gray-600 mb-1">{invite.email}</p>
@@ -259,9 +454,15 @@ const Admin = () => {
                       {invite.note && (
                         <p className="text-sm text-gray-500 italic">{invite.note}</p>
                       )}
-                      <p className="text-xs text-gray-500 mt-2">
-                        Expira: {format(new Date(invite.expires_at), 'dd MMM yyyy', { locale: es })}
-                      </p>
+                      {invite.expires_at ? (
+                        <p className="text-xs text-gray-500 mt-2">
+                          Expira: {format(new Date(invite.expires_at), 'dd MMM yyyy', { locale: es })}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-blue-600 mt-2">
+                          ✓ Sin fecha de expiración
+                        </p>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       {!invite.used && !invite.revoked && (

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
-from utils import require_auth_user
+from utils import require_any_authenticated, require_permission
+from utils.permissions import Permission
 from core import config
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
@@ -9,7 +10,7 @@ api_router = APIRouter(prefix="")
 
 # ============= DASHBOARD =============
 @api_router.get("/dashboard/stats")
-async def get_dashboard_stats(current_user: Dict[str, Any] = Depends(require_auth_user)):
+async def get_dashboard_stats(current_user: Dict[str, Any] = Depends(require_permission(Permission.VIEW_DASHBOARD))):
     """Get dashboard statistics"""
     # Total miembros
     miembros_result = supabase.table('miembros').select('uuid', count='exact').eq('is_deleted', False).execute()

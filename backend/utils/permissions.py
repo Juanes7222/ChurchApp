@@ -63,6 +63,7 @@ class Role(str, Enum):
     ADMIN = "admin"
     PASTOR = "pastor"
     SECRETARIA = "secretaria"
+    LIDER = "lider"
     AGENTE_RESTAURANTE = "agente_restaurante"
     AYUDANTE_RESTAURANTE = "ayudante_restaurante"
     TI = "ti"  # Rol técnico especial
@@ -112,47 +113,72 @@ ROLE_PERMISSIONS: Dict[str, Set[Permission]] = {
         Permission.MANAGE_TEMP_USERS,
     },
     
-    # Pastor: Gestión completa de miembros, grupos, observaciones
+    # Pastor: Ver información completa, sin modificar configuraciones técnicas
+    # Puede crear/eliminar usuarios pero no asignar roles ni modificar sistema
     Role.PASTOR: {
         Permission.VIEW_DASHBOARD,
-        # Miembros
+        # Miembros - SOLO LECTURA
         Permission.VIEW_MIEMBROS,
-        Permission.CREATE_MIEMBROS,
-        Permission.EDIT_MIEMBROS,
-        Permission.DELETE_MIEMBROS,
-        # Grupos
+        # Grupos - SOLO LECTURA
         Permission.VIEW_GRUPOS,
-        Permission.CREATE_GRUPOS,
-        Permission.EDIT_GRUPOS,
-        Permission.DELETE_GRUPOS,
-        # Observaciones
+        # Observaciones - SOLO LECTURA
         Permission.VIEW_OBSERVACIONES,
-        Permission.CREATE_OBSERVACIONES,
-        Permission.EDIT_OBSERVACIONES,
-        Permission.DELETE_OBSERVACIONES,
+        # POS - SOLO LECTURA (reportes y consultas)
+        Permission.VIEW_POS,
+        Permission.VIEW_SALES,
+        Permission.VIEW_MEMBER_ACCOUNTS,
+        Permission.VIEW_SALES_REPORTS,
+        Permission.VIEW_INVENTORY_REPORTS,
+        Permission.VIEW_ACCOUNTS_REPORTS,
+        # Administración limitada
+        Permission.MANAGE_USERS,  # Puede crear/eliminar usuarios
     },
     
-    # Secretaria: Gestión completa de miembros, grupos, observaciones
+    # Secretaria: Operativo-administrativo
+    # Puede crear/editar miembros, registrar pagos, consultar reportes
     Role.SECRETARIA: {
         Permission.VIEW_DASHBOARD,
-        # Miembros
+        # Miembros - COMPLETO
         Permission.VIEW_MIEMBROS,
         Permission.CREATE_MIEMBROS,
         Permission.EDIT_MIEMBROS,
-        Permission.DELETE_MIEMBROS,
-        # Grupos
+        # Grupos - COMPLETO
         Permission.VIEW_GRUPOS,
         Permission.CREATE_GRUPOS,
         Permission.EDIT_GRUPOS,
-        Permission.DELETE_GRUPOS,
-        # Observaciones
+        # Observaciones - COMPLETO
         Permission.VIEW_OBSERVACIONES,
         Permission.CREATE_OBSERVACIONES,
         Permission.EDIT_OBSERVACIONES,
-        Permission.DELETE_OBSERVACIONES,
+        # POS - Consultas y pagos (NO abrir/cerrar turnos, NO anular ventas)
+        Permission.VIEW_POS,
+        Permission.VIEW_SALES,
+        Permission.VIEW_MEMBER_ACCOUNTS,
+        Permission.MANAGE_PAYMENTS,  # Puede registrar abonos
+        Permission.VIEW_SALES_REPORTS,
+        Permission.VIEW_ACCOUNTS_REPORTS,
+        # Administración limitada
+        Permission.MANAGE_USERS,  # Puede crear/eliminar usuarios
     },
     
-    # Agente Restaurante: Acceso completo al POS, puede administrar todo
+    # Líder: Acceso limitado a su grupo
+    # Solo lectura de información básica de miembros de su grupo (sin info financiera)
+    # Rol futuro, escalable
+    Role.LIDER: {
+        Permission.VIEW_DASHBOARD,
+        # Solo ver información básica de miembros
+        Permission.VIEW_MIEMBROS,
+        # Solo ver grupos (su propio liderazgo)
+        Permission.VIEW_GRUPOS,
+        # Solo ver observaciones públicas
+        Permission.VIEW_OBSERVACIONES,
+        # NO acceso al restaurante
+        # NO acceso a información financiera
+    },
+    
+    # Agente Restaurante (Administrador del Restaurante): 
+    # Acceso total al POS, puede administrar turnos, ventas, productos, cuentas
+    # NO puede acceder a información sensible de la iglesia (miembros, grupos, observaciones)
     Role.AGENTE_RESTAURANTE: {
         Permission.VIEW_DASHBOARD,
         # POS completo
@@ -176,9 +202,10 @@ ROLE_PERMISSIONS: Dict[str, Set[Permission]] = {
         Permission.MANAGE_TEMP_USERS,
     },
     
-    # Ayudante Restaurante: Operaciones básicas del POS (temporal)
+    # Ayudante Restaurante (Usuario temporal de ventas - mesero):
+    # Operaciones básicas del POS únicamente durante el turno activo
     Role.AYUDANTE_RESTAURANTE: {
-        # Solo operaciones básicas
+        # Solo operaciones básicas de venta
         Permission.VIEW_POS,
         Permission.CREATE_SALES,
         Permission.VIEW_SALES,

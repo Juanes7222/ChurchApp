@@ -6,7 +6,8 @@ RF-STOCK, RF-REPORT, RF-OFFLINE
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Dict, Any, Optional, cast
 from core import config
-from utils.auth import require_admin, require_auth_user
+from utils.auth import require_admin, require_pos_access, require_permission, require_auth_user
+from utils.permissions import Permission
 from datetime import datetime, timezone
 from decimal import Decimal
 import logging
@@ -21,7 +22,7 @@ supabase = config.supabase
 async def list_inventario(
     producto_uuid: Optional[str] = None,
     bajo_stock: bool = False,
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_permission(Permission.VIEW_INVENTORY))
 ) -> Dict[str, Any]:
     """RF-STOCK-01: Listar inventario con filtros"""
     try:
@@ -135,7 +136,7 @@ async def reporte_ventas(
     producto_uuid: Optional[str] = None,
     vendedor_uuid: Optional[str] = None,
     formato: str = Query("json", regex="^(json|csv)$"),
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_permission(Permission.VIEW_SALES_REPORTS))
 ) -> Dict[str, Any]:
     """RF-REPORT-02: Reporte de ventas por rango y producto"""
     try:
@@ -190,7 +191,7 @@ async def reporte_ventas(
 @pos_reportes_router.get("/reportes/cuentas-pendientes")
 async def reporte_cuentas_pendientes(
     antiguedad: Optional[int] = Query(None, description="Días de antigüedad: 30, 60, 90"),
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_permission(Permission.VIEW_ACCOUNTS_REPORTS))
 ) -> Dict[str, Any]:
     """RF-REPORT-03: Reporte de cuentas por miembro (deudas)"""
     try:

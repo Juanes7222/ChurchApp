@@ -24,6 +24,7 @@ import POSReportes from './pages/POSReportes';
 import POSInventario from './pages/POSInventario';
 import MeseroLogin from './pages/MeseroLogin';
 import ClientesTemporales from './pages/ClientesTemporales';
+import InvitePage from './pages/InvitePage';
 import './App.css';
 
 // React Query client
@@ -101,6 +102,9 @@ function App() {
         <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          
+          {/* Página de invitación - Pública */}
+          <Route path="/invite/:token" element={<InvitePage />} />
           
           <Route
             path="/"

@@ -14,7 +14,8 @@ from models.models import (
     MeseroPin,
 )
 from core import config
-from utils.auth import require_admin, require_auth_user, require_any_authenticated, create_access_token
+from utils.auth import require_admin, require_auth_user, require_any_authenticated, create_access_token, require_permission
+from utils.permissions import Permission
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 import bcrypt
@@ -1283,7 +1284,7 @@ async def get_venta_detalle(
 async def get_reporte_ventas(
     fecha_desde: Optional[str] = None,
     fecha_hasta: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(require_admin)
+    current_user: Dict[str, Any] = Depends(require_permission(Permission.VIEW_SALES_REPORTS))
 ) -> Dict[str, Any]:
     """RF-REPORT-02: Reporte de ventas con filtros de fecha"""
     try:
@@ -1331,7 +1332,7 @@ async def get_reporte_ventas(
 async def get_reporte_productos(
     fecha_desde: Optional[str] = None,
     fecha_hasta: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(require_admin)
+    current_user: Dict[str, Any] = Depends(require_permission(Permission.VIEW_SALES_REPORTS))
 ) -> Dict[str, Any]:
     """RF-REPORT-03: Reporte de productos más vendidos"""
     try:
@@ -1373,7 +1374,7 @@ async def get_reporte_productos(
 
 @pos_router.get("/reportes/deudas")
 async def get_reporte_deudas(
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_permission(Permission.VIEW_ACCOUNTS_REPORTS))
 ) -> Dict[str, Any]:
     """RF-REP-03: Obtener reporte de deudas totales de miembros"""
     try:

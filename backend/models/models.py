@@ -1,6 +1,6 @@
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from decimal import Decimal
 # UUID removido - ahora usamos str para todos los identificadores
 
@@ -13,19 +13,47 @@ class AuthResponse(BaseModel):
     user: Dict[str, Any]
 
 class InviteRequest(BaseModel):
-    role: str
+    """
+    Modelo para crear invitaciones de registro.
+    
+    Roles permitidos:
+    - pastor: Ver información completa, sin modificar sistema
+    - secretaria: Operativo-administrativo, puede editar miembros y registrar pagos
+    - agente_restaurante: Administrador del restaurante
+    - lider: Acceso limitado a su grupo (futuro)
+    
+    Nota: El rol 'admin' NO puede ser invitado, solo creado directamente
+    
+    expires_days: Días de validez de la invitación. Si es None, la invitación es permanente.
+    """
+    role: Literal["pastor", "secretaria", "agente_restaurante", "lider"]
     email: Optional[str] = None
     note: Optional[str] = None
-    expires_days: int = 7
+    expires_days: Optional[int] = 7
+    
+    @validator('role')
+    def validate_role(cls, v):
+        """Validar que no se intente crear una invitación para admin"""
+        if v == 'admin':
+            raise ValueError('El rol admin no puede ser invitado, solo creado directamente')
+        return v
+    
+    @validator('expires_days')
+    def validate_expires_days(cls, v):
+        """Validar que expires_days sea positivo si se proporciona"""
+        if v is not None and v <= 0:
+            raise ValueError('expires_days debe ser un número positivo')
+        return v
 
 class InviteResponse(BaseModel):
     token: str
     role: str
-    expires_at: str
+    expires_at: Optional[str] = None
     created_at: str
 
 class ConsumeInviteRequest(BaseModel):
-    token: str
+    token: str  # Token de invitación
+    google_token: str  # Token de Firebase/Google
 
 class MiembroCreate(BaseModel):
     documento: str

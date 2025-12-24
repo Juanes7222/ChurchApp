@@ -255,6 +255,18 @@ const POSVentasPage = () => {
               )}
             </div>
 
+            {/* Botón de cerrar sesión para meseros */}
+            {meseroSession && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                Cerrar Sesión
+              </Button>
+            )}
+
             {/* Botón nuevo ticket */}
             <Button
               variant="outline"

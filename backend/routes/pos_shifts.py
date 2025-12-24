@@ -92,33 +92,55 @@ async def open_shift(
             fin_validity = cierre_hora.astimezone(timezone.utc)
             
             for pin_mesero in shift.meseros:
-                username = f"mesero_{next_num}"
-                display_name = f"Mesero {next_num}"
-                
                 if not pin_mesero.miembro_uuid:
-                    logger.warning(f"Mesero sin miembro_uuid, usando username como fallback")
+                    logger.warning(f"Mesero sin miembro_uuid, saltando")
+                    continue
                 
-                numero_documento = None
-                if pin_mesero.miembro_uuid:
-                    miembro_result = supabase.table('miembros').select('documento').eq('uuid', str(pin_mesero.miembro_uuid)).execute()
-                    if miembro_result.data:
-                        miembro = cast(Dict[str, Any], miembro_result.data[0])
-                        numero_documento = miembro.get('documento')
-                        
-                        if not numero_documento or (isinstance(numero_documento, str) and numero_documento.strip() == ''):
-                            logger.warning(f"Miembro {pin_mesero.miembro_uuid} no tiene documento")
-                            numero_documento = None
+                # Obtener información del miembro (documento y nombres)
+                miembro_result = supabase.table('miembros').select('documento, nombres, apellidos').eq('uuid', str(pin_mesero.miembro_uuid)).execute()
+                if not miembro_result.data:
+                    logger.warning(f"Miembro {pin_mesero.miembro_uuid} no encontrado")
+                    continue
+                
+                miembro = cast(Dict[str, Any], miembro_result.data[0])
+                numero_documento = miembro.get('documento')
+                
+                if not numero_documento or (isinstance(numero_documento, str) and numero_documento.strip() == ''):
+                    logger.warning(f"Miembro {pin_mesero.miembro_uuid} no tiene documento válido")
+                    continue
+                
+                # Usar el número de documento como username
+                username = str(numero_documento).strip()
+                display_name = f"{miembro.get('nombres', '')} {miembro.get('apellidos', '')}".strip()
+                
+                # Verificar si ya existe un usuario temporal con ese documento activo
+                existing_user = supabase.table('usuarios_temporales')\
+                    .select('uuid')\
+                    .eq('username', username)\
+                    .eq('activo', True)\
+                    .execute()
+                
+                if existing_user.data and len(existing_user.data) > 0:
+                    logger.info(f"Usuario temporal con documento {username} ya existe y está activo")
+                    meseros_creados.append({
+                        'username': username,
+                        'display_name': display_name,
+                        'documento': numero_documento,
+                        'pin': pin_mesero.pin,
+                        'ya_existia': True
+                    })
+                    continue
                 
                 pin_hash = hashlib.sha256(pin_mesero.pin.encode()).hexdigest()
                 
                 mesero_data = {
                     'uuid': str(uuid_lib.uuid4()),
-                    'username': username,
-                    'display_name': display_name,
+                    'username': username,  # Documento como username
+                    'display_name': display_name,  # Nombre completo del miembro
                     'pin_hash': pin_hash,
                     'pin_plain': pin_mesero.pin,  # Guardar PIN en texto plano para consulta administrativa
                     'shift_uuid': shift_data['uuid'],  # Relacionar mesero con el turno
-                    'miembro_uuid': str(pin_mesero.miembro_uuid) if pin_mesero.miembro_uuid else None,
+                    'miembro_uuid': str(pin_mesero.miembro_uuid),
                     'activo': True,
                     'inicio_validity': now_utc.isoformat(),
                     'fin_validity': fin_validity.isoformat(),
@@ -132,10 +154,9 @@ async def open_shift(
                         'username': username,
                         'display_name': display_name,
                         'documento': numero_documento,
-                        'pin': pin_mesero.pin
+                        'pin': pin_mesero.pin,
+                        'ya_existia': False
                     })
-                
-                next_num += 1
         
         return cast(Dict[str, Any], {
             **cast(Dict[str, Any], shift_created),

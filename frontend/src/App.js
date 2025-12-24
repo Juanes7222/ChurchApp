@@ -11,6 +11,7 @@ import './App.css';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import MeseroLogin from './pages/MeseroLogin';
+import RequireMeseroAuth from './components/RequireMeseroAuth';
 
 // Lazy loading para páginas (code splitting)
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -317,11 +318,13 @@ function App() {
           {/* Login de Meseros - Público */}
           <Route path="/mesero-login" element={<MeseroLogin />} />
           
-          {/* Ventas para Meseros - Sin autenticación Firebase */}
+          {/* Ventas para Meseros - Requiere autenticación de mesero */}
           <Route path="/mesero/ventas" element={
-            <RequireActiveShift>
-              <POSVentasPage />
-            </RequireActiveShift>
+            <RequireMeseroAuth>
+              <RequireActiveShift>
+                <POSVentasPage />
+              </RequireActiveShift>
+            </RequireMeseroAuth>
           } />
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

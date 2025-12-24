@@ -18,6 +18,8 @@ const Miembros = lazy(() => import('./pages/Miembros'));
 const MiembroForm = lazy(() => import('./pages/MiembroForm'));
 const MiembroDetalle = lazy(() => import('./pages/MiembroDetalle'));
 const Grupos = lazy(() => import('./pages/Grupos'));
+const GrupoForm = lazy(() => import('./pages/GrupoForm'));
+const GrupoDetalle = lazy(() => import('./pages/GrupoDetalle'));
 const Admin = lazy(() => import('./pages/Admin'));
 const InvitePage = lazy(() => import('./pages/InvitePage'));
 
@@ -188,6 +190,30 @@ function App() {
               element={
                 <ProtectedRoute section="grupos" redirectTo="/dashboard">
                   <Grupos />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="grupos/nuevo" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.CREATE_GRUPOS} redirectTo="/grupos">
+                  <GrupoForm />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="grupos/:id" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.VIEW_GRUPOS} redirectTo="/dashboard">
+                  <GrupoDetalle />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="grupos/:id/editar" 
+              element={
+                <ProtectedRoute permission={PERMISSIONS.EDIT_GRUPOS} redirectTo="/grupos">
+                  <GrupoForm />
                 </ProtectedRoute>
               } 
             />

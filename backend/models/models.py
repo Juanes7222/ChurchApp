@@ -127,6 +127,13 @@ class GrupoCreate(BaseModel):
     tipo: Optional[str] = None
     privacidad: str = "public"
 
+class GrupoUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    tipo: Optional[str] = None
+    activo: Optional[bool] = None
+    privacidad: Optional[str] = None
+
 class GrupoResponse(BaseModel):
     uuid: str
     nombre: str
@@ -135,6 +142,8 @@ class GrupoResponse(BaseModel):
     activo: bool
     privacidad: str
     created_at: str
+    miembros: Optional[list] = []
+    total_miembros: Optional[int] = 0
 
 # --- Product Models ---
 class ProductoCreate(BaseModel):

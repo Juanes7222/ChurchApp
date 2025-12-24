@@ -3,6 +3,7 @@ from models.models import MiembroCreate, MiembroUpdate, MiembroResponse
 from utils import require_auth_user, require_admin
 from utils.auth import require_any_authenticated
 from core import config
+from core.cache import cached, invalidate_cache_pattern
 from typing import Optional, Dict, Any, List, cast
 from datetime import datetime, timezone
 import uuid
@@ -12,6 +13,7 @@ supabase = config.supabase
 api_router = APIRouter(prefix="")
 
 # ============= MIEMBROS =============
+@cached(ttl_seconds=300, key_prefix="miembros_list")
 @api_router.get("/miembros", response_model=Dict[str, Any])
 async def list_miembros(
     q: Optional[str] = None,
@@ -21,7 +23,11 @@ async def list_miembros(
     current_user: Dict[str, Any] = Depends(require_any_authenticated)
 ) -> Dict[str, Any]:
     """List members with search and filters - Accessible by any authenticated user including meseros"""
-    query = supabase.table('miembros').select('*', count='exact').eq('is_deleted', False)  # type: ignore
+    # Optimización: solo traer campos necesarios para la vista de lista
+    query = supabase.table('miembros').select(
+        'uuid, documento, nombres, apellidos, telefono, email, foto_url, created_at',
+        count='exact'  # type: ignore
+    ).eq('is_deleted', False)
     
     if q:
         # Search by documento, nombres, apellidos
@@ -75,6 +81,10 @@ async def create_miembro(miembro: MiembroCreate, current_user: Dict[str, Any] = 
     
     result = supabase.table('miembros').insert(data).execute()
     print(f"DEBUG - Inserted data: {result.data[0]}")  # Debug log
+    
+    # Invalidar caché después de crear miembro
+    invalidate_cache_pattern("miembros")
+    
     return cast(Dict[str, Any], result.data[0])
 
 @api_router.put("/miembros/{miembro_uuid}", response_model=MiembroResponse)
@@ -96,6 +106,10 @@ async def update_miembro(
     
     result = supabase.table('miembros').update(data).eq('uuid', miembro_uuid).execute()
     print(f"DEBUG - Updated data: {result.data[0]}")  # Debug log
+    
+    # Invalidar caché después de actualizar miembro
+    invalidate_cache_pattern("miembros")
+    
     return cast(Dict[str, Any], result.data[0])
 
 @api_router.delete("/miembros/{miembro_uuid}")
@@ -108,6 +122,10 @@ async def delete_miembro(miembro_uuid: str, current_user: Dict[str, Any] = Depen
     
     if not result.data:
         raise HTTPException(status_code=404, detail="Miembro no encontrado")
+    
+    # Invalidar caché después de eliminar miembro
+    invalidate_cache_pattern("miembros")
+    
     return {"message": "Miembro eliminado"}
 
 

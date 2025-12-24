@@ -194,7 +194,7 @@ class MeseroPin(BaseModel):
 
 class CajaShiftCreate(BaseModel):
     apertura_por: str  # Firebase UID (not a standard UUID)
-    efectivo_inicial: Decimal
+    efectivo_inicial: Optional[Decimal] = None  # DESACTIVADO: Campo opcional para reactivar en futuro si se necesita
     meseros: Optional[List[MeseroPin]] = []  # Lista de PINs para crear meseros
 
 class CajaShiftResponse(CajaShiftCreate):
@@ -203,7 +203,7 @@ class CajaShiftResponse(CajaShiftCreate):
     apertura_fecha: datetime
 
 class CajaShiftClose(BaseModel):
-    efectivo_recuento: Decimal
+    # efectivo_recuento: Decimal  # ELIMINADO: Se calcula automáticamente
     notas: Optional[str] = None
 
 # --- UsuarioTemporal Models ---

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from models.models import GrupoCreate, GrupoUpdate, GrupoResponse
 from utils import require_auth_user, require_admin
 from core import config
+from core.cache import cached, invalidate_cache_pattern
 from datetime import datetime, timezone
 from typing import Dict, Any
 
@@ -9,6 +10,7 @@ supabase = config.supabase
 api_router = APIRouter(prefix="")
 
 # ============= GRUPOS =============
+@cached(ttl_seconds=600, key_prefix="grupos_list")
 @api_router.get("/grupos")
 async def list_grupos(current_user: Dict[str, Any] = Depends(require_auth_user)):
     """List all groups with member count"""
@@ -72,6 +74,9 @@ async def update_grupo(grupo_uuid: str, grupo: GrupoUpdate, current_user: Dict[s
     
     result = supabase.table('grupos').update(update_data).eq('uuid', grupo_uuid).execute()
     
+    # Invalidar caché después de actualización
+    invalidate_cache_pattern("grupos")
+    
     # Obtener el grupo actualizado con miembros
     updated_grupo = supabase.table('grupos').select('*, miembros:grupo_miembro(miembro_uuid, miembros(*))').eq('uuid', grupo_uuid).execute()
     grupo_data = updated_grupo.data[0]
@@ -85,7 +90,6 @@ async def update_grupo(grupo_uuid: str, grupo: GrupoUpdate, current_user: Dict[s
     grupo_data['total_miembros'] = len(grupo_data['miembros'])
     
     return grupo_data
-
 @api_router.delete("/grupos/{grupo_uuid}")
 async def delete_grupo(grupo_uuid: str, current_user: Dict[str, Any] = Depends(require_admin)):
     """Soft delete a group"""
@@ -96,6 +100,10 @@ async def delete_grupo(grupo_uuid: str, current_user: Dict[str, Any] = Depends(r
     
     # Soft delete
     supabase.table('grupos').update({'is_deleted': True}).eq('uuid', grupo_uuid).execute()
+    
+    # Invalidar caché después de eliminación
+    invalidate_cache_pattern("grupos")
+    
     return {"message": "Grupo eliminado exitosamente"}
 
 @api_router.post("/grupos/{grupo_uuid}/miembros/{miembro_uuid}")
@@ -111,6 +119,10 @@ async def assign_member_to_group(
         "fecha_ingreso": datetime.now(timezone.utc).date().isoformat()
     }
     result = supabase.table('grupo_miembro').insert(data).execute()
+    
+    # Invalidar caché después de asignar miembro
+    invalidate_cache_pattern("grupos")
+    
     return {"message": "Miembro asignado al grupo", "data": result.data[0]}
 
 @api_router.delete("/grupos/{grupo_uuid}/miembros/{miembro_uuid}")
@@ -121,4 +133,8 @@ async def remove_member_from_group(
 ):
     """Remove member from group"""
     result = supabase.table('grupo_miembro').delete().eq('grupo_uuid', grupo_uuid).eq('miembro_uuid', miembro_uuid).execute()
+    
+    # Invalidar caché después de remover miembro
+    invalidate_cache_pattern("grupos")
+    
     return {"message": "Miembro removido del grupo"}

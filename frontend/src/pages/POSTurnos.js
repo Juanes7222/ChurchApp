@@ -176,7 +176,7 @@ const POSTurnos = () => {
     
     openMutation.mutate({
       apertura_por: user?.uid,
-      efectivo_inicial: parseFloat(openFormData.monto_apertura) || 0,
+      // efectivo_inicial: parseFloat(openFormData.monto_apertura) || 0, // DESACTIVADO
       meseros: meserosValidos,
     });
   };
@@ -218,7 +218,7 @@ const POSTurnos = () => {
     e.preventDefault();
     closeMutation.mutate({
       shiftUuid: selectedShift?.uuid,
-      efectivo_recuento: parseFloat(closeFormData.monto_cierre) || 0,
+      // efectivo_recuento ya no se envía - se calcula automáticamente en el backend
       notas: closeFormData.notas || null,
     });
   };
@@ -416,6 +416,7 @@ const POSTurnos = () => {
           </DialogHeader>
           <form onSubmit={handleOpenShift}>
             <div className="grid gap-4 py-4">
+              {/* DESACTIVADO: Campo de monto de apertura - Para reactivar, descomentar este bloque
               <div className="space-y-2">
                 <Label htmlFor="monto_apertura">Monto de Apertura *</Label>
                 <div className="relative">
@@ -433,6 +434,7 @@ const POSTurnos = () => {
                   />
                 </div>
               </div>
+              */}
               
               {/* Sección de Meseros */}
               <div className="space-y-2">
@@ -537,11 +539,12 @@ const POSTurnos = () => {
               Cerrar Turno de Caja
             </DialogTitle>
             <DialogDescription>
-              Ingresa el monto final de caja para cerrar el turno.
+              El monto de cierre se calculará automáticamente según las ventas en efectivo del turno.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCloseShift}>
             <div className="grid gap-4 py-4">
+              {/* ELIMINADO: Monto de cierre manual - Ahora se calcula automáticamente
               <div className="space-y-2">
                 <Label htmlFor="monto_cierre">Monto de Cierre *</Label>
                 <div className="relative">
@@ -559,6 +562,7 @@ const POSTurnos = () => {
                   />
                 </div>
               </div>
+              */}
               <div className="space-y-2">
                 <Label htmlFor="notas_cierre">Notas (opcional)</Label>
                 <Input
@@ -619,6 +623,83 @@ const POSTurnos = () => {
                         <div key={index} className="flex justify-between">
                           <span className="capitalize">{pago.metodo}</span>
                           <span className="font-medium">{formatMoney(pago.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Cajero/Admin */}
+              {shiftSummary.cajero && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Cajero/Administrador</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-gray-400" />
+                        <p className="font-medium">{shiftSummary.cajero.nombre}</p>
+                        {shiftSummary.cajero_vendio && (
+                          <Badge variant="default" className="text-xs">Vendió</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Meseros */}
+              {shiftSummary.meseros && shiftSummary.meseros.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Meseros Asignados al Turno</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {shiftSummary.meseros.map((mesero, index) => (
+                        <div key={index} className="flex justify-between items-start border-b pb-2 last:border-0">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{mesero.display_name}</p>
+                              {mesero.hizo_ventas ? (
+                                <Badge variant="default" className="text-xs">Vendió</Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs">Sin ventas</Badge>
+                              )}
+                            </div>
+                            {mesero.miembro_nombre && (
+                              <p className="text-sm text-gray-500">{mesero.miembro_nombre}</p>
+                            )}
+                            <p className="text-xs text-gray-400">{mesero.username}</p>
+                          </div>
+                          {mesero.pin && (
+                            <div className="text-right">
+                              <p className="text-xs text-gray-500">PIN</p>
+                              <p className="text-lg font-mono font-bold text-blue-600">{mesero.pin}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Otros vendedores */}
+              {shiftSummary.otros_vendedores && shiftSummary.otros_vendedores.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Otros Vendedores</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {shiftSummary.otros_vendedores.map((vendedor, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-gray-400" />
+                          <p className="font-medium">{vendedor.nombre}</p>
+                          <Badge variant="default" className="text-xs">Vendió</Badge>
                         </div>
                       ))}
                     </div>

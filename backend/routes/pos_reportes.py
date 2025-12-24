@@ -140,7 +140,8 @@ async def reporte_ventas(
 ) -> Dict[str, Any]:
     """RF-REPORT-02: Reporte de ventas por rango y producto"""
     try:
-        query = supabase.table('ventas').select('*, venta_items(*), vendedor:usuarios_temporales(display_name)').eq('is_deleted', False)
+        # No incluir JOIN con vendedor ya que puede ser mesero o miembro
+        query = supabase.table('ventas').select('*, venta_items(*)').eq('is_deleted', False)
         
         if fecha_desde:
             query = query.gte('fecha_hora', fecha_desde)
@@ -187,6 +188,115 @@ async def reporte_ventas(
     except Exception as e:
         logger.error(f"Error reporte ventas: {e}")
         raise HTTPException(status_code=500, detail="Error al generar reporte")
+
+@pos_reportes_router.get("/reportes/productos")
+async def reporte_productos(
+    fecha_desde: Optional[str] = None,
+    fecha_hasta: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(require_permission(Permission.VIEW_SALES_REPORTS))
+) -> Dict[str, Any]:
+    """Reporte de productos más vendidos"""
+    try:
+        query = supabase.table('venta_items').select('*, productos(nombre, codigo), ventas!inner(fecha_hora, is_deleted)')
+        
+        # Filtrar solo ventas no eliminadas
+        query = query.eq('ventas.is_deleted', False)
+        
+        if fecha_desde:
+            query = query.gte('ventas.fecha_hora', fecha_desde)
+        
+        if fecha_hasta:
+            query = query.lte('ventas.fecha_hora', fecha_hasta)
+        
+        result = query.execute()
+        items = result.data or []
+        
+        # Agrupar por producto
+        productos_stats = {}
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            
+            producto_uuid = item.get('producto_uuid')
+            if not producto_uuid:
+                continue
+            
+            if producto_uuid not in productos_stats:
+                producto_info = item.get('productos', {})
+                productos_stats[producto_uuid] = {
+                    'producto_uuid': producto_uuid,
+                    'nombre': producto_info.get('nombre', 'N/A') if isinstance(producto_info, dict) else 'N/A',
+                    'codigo': producto_info.get('codigo', '') if isinstance(producto_info, dict) else '',
+                    'cantidad_vendida': 0,
+                    'total_vendido': 0
+                }
+            
+            productos_stats[producto_uuid]['cantidad_vendida'] += float(item.get('cantidad', 0))
+            productos_stats[producto_uuid]['total_vendido'] += float(item.get('total_item', 0))
+        
+        # Convertir a lista y ordenar por cantidad vendida
+        productos_list = sorted(
+            list(productos_stats.values()),
+            key=lambda x: x['cantidad_vendida'],
+            reverse=True
+        )
+        
+        return {
+            "productos": productos_list,
+            "resumen": {
+                "num_productos": len(productos_list),
+                "total_items_vendidos": sum(p['cantidad_vendida'] for p in productos_list)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error reporte productos: {e}")
+        raise HTTPException(status_code=500, detail="Error al generar reporte de productos")
+
+@pos_reportes_router.get("/reportes/deudas")
+async def reporte_deudas(
+    current_user: Dict[str, Any] = Depends(require_permission(Permission.VIEW_ACCOUNTS_REPORTS))
+) -> Dict[str, Any]:
+    """Reporte de cuentas con saldo deudor (deudas)"""
+    try:
+        # Obtener todas las cuentas con sus totales
+        result = supabase.table('cuentas_miembro').select(
+            '*, miembro:miembros(documento, nombres, apellidos, telefono)'
+        ).eq('is_deleted', False).execute()
+        
+        cuentas = result.data or []
+        
+        # Filtrar solo cuentas con saldo deudor > 0
+        cuentas_deudoras = []
+        for cuenta in cuentas:
+            if not isinstance(cuenta, dict):
+                continue
+            
+            saldo_deudor = float(cuenta.get('saldo_deudor', 0))
+            if saldo_deudor > 0:
+                miembro_info = cuenta.get('miembro', {})
+                cuentas_deudoras.append({
+                    'cuenta_uuid': cuenta.get('uuid'),
+                    'miembro_uuid': cuenta.get('miembro_uuid'),
+                    'miembro': miembro_info if isinstance(miembro_info, dict) else {},
+                    'saldo_deudor': saldo_deudor,
+                    'limite_credito': float(cuenta.get('limite_credito', 0))
+                })
+        
+        # Ordenar por saldo deudor descendente
+        cuentas_deudoras.sort(key=lambda x: x['saldo_deudor'], reverse=True)
+        
+        total_deuda = sum(c['saldo_deudor'] for c in cuentas_deudoras)
+        
+        return {
+            "deudas": cuentas_deudoras,
+            "resumen": {
+                "num_cuentas_deudoras": len(cuentas_deudoras),
+                "total_deuda": total_deuda
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error reporte deudas: {e}")
+        raise HTTPException(status_code=500, detail="Error al generar reporte de deudas")
 
 @pos_reportes_router.get("/reportes/cuentas-pendientes")
 async def reporte_cuentas_pendientes(

@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
-import { ChurchIcon, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import churchLogo from '../assets/img/logo-mmm.png';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -46,15 +47,19 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4">
       <Card className="w-full max-w-md shadow-xl border-none" data-testid="login-card">
         <CardHeader className="space-y-4 text-center pb-8">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-            <ChurchIcon className="w-9 h-9 text-white" />
+          <div className="mx-auto w-15 h-14 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
+            <img 
+              src={churchLogo} 
+              alt="Logo Iglesia" 
+              className="w-full h-full object-cover"
+            />
           </div>
           <div>
             <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Sistema Iglesia
+              Sistema de Información MMM Cartago
             </CardTitle>
             <CardDescription className="text-base mt-2">
-              Gestión de miembros y comunidad
+              Gestión de miembros
             </CardDescription>
           </div>
         </CardHeader>

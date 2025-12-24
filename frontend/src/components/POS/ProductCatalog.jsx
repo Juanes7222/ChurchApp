@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchProductos, fetchCategorias } from '../../services/api';
 import { Card, CardContent } from '../ui/card';
@@ -189,9 +189,9 @@ const ProductCatalog = () => {
 };
 
 /**
- * Tarjeta de producto individual
+ * Tarjeta de producto individual - Optimizada con React.memo
  */
-const ProductCard = ({ producto, onClick }) => {
+const ProductCard = memo(({ producto, onClick }) => {
   return (
     <Button
       variant="outline"
@@ -220,6 +220,12 @@ const ProductCard = ({ producto, onClick }) => {
       </div>
     </Button>
   );
-};
+}, (prevProps, nextProps) => {
+  // Solo re-renderizar si el producto cambió
+  return prevProps.producto.uuid === nextProps.producto.uuid &&
+         prevProps.producto.stock === nextProps.producto.stock &&
+         prevProps.producto.precio === nextProps.producto.precio &&
+         prevProps.producto.favorito === nextProps.producto.favorito;
+});
 
 export default ProductCatalog;

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any, Optional, cast
 from models.models import ProductoCreate, CategoriaProducto
 from core import config
+from core.cache import cached, invalidate_cache_pattern
 from utils.auth import require_admin
 from datetime import datetime, timezone
 import logging
@@ -18,6 +19,7 @@ supabase = config.supabase
 
 # ============= PRODUCTOS (RF-PROD) =============
 
+@cached(ttl_seconds=180, key_prefix="productos")
 @pos_productos_router.get("/productos")
 async def list_productos(
     q: Optional[str] = None,
@@ -30,7 +32,10 @@ async def list_productos(
     NOTA: Endpoint público para permitir acceso sin autenticación (catálogo)
     """
     try:
-        query = supabase.table('productos').select('*').eq('is_deleted', False)
+        # Optimización: solo traer campos necesarios para el POS
+        query = supabase.table('productos').select(
+            'uuid, codigo, nombre, descripcion, precio, activo, favorito, categoria_uuid'
+        ).eq('is_deleted', False)
         
         if activo is not None:
             query = query.eq('activo', activo)
@@ -84,6 +89,9 @@ async def create_producto(
         if not result.data:
             raise HTTPException(status_code=500, detail="Error al crear producto")
         
+        # Invalidar caché después de crear producto
+        invalidate_cache_pattern("productos")
+        
         return cast(Dict[str, Any], result.data[0])
     except HTTPException:
         raise
@@ -120,6 +128,9 @@ async def update_producto(
             
         result = supabase.table('productos').update(data).eq('uuid', producto_uuid).execute()
         
+        # Invalidar caché después de actualizar producto
+        invalidate_cache_pattern("productos")
+        
         return cast(Dict[str, Any], result.data[0])
     except HTTPException:
         raise
@@ -138,6 +149,9 @@ async def delete_producto(
         
         if not result.data:
             raise HTTPException(status_code=404, detail="Producto no encontrado")
+        
+        # Invalidar caché después de eliminar producto
+        invalidate_cache_pattern("productos")
         
         return {"message": "Producto eliminado"}
     except HTTPException:

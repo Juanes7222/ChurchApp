@@ -16,6 +16,7 @@ import {
   ShoppingCart
 } from 'lucide-react';
 import { toast } from 'sonner';
+import churchLogo from '../assets/img/logo-mmm.png';
 
 const Layout = () => {
   const location = useLocation();
@@ -92,9 +93,11 @@ const Layout = () => {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
             <Link to="/dashboard" className="flex items-center gap-3" data-testid="logo-link">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
-                <ChurchIcon className="w-6 h-6 text-white" />
-              </div>
+              <img 
+                src={churchLogo} 
+                alt="Logo Iglesia" 
+                className="w-full h-full object-cover"
+              />
               <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 Iglesia
               </span>
@@ -220,7 +223,7 @@ const Layout = () => {
               <ChurchIcon className="w-5 h-5 text-white" />
             </div>
             <span className="font-bold text-lg bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Iglesia
+              MMM Cartago
             </span>
           </div>
           <div className="w-10" /> {/* Spacer for centering */}

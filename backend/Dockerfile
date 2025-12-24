@@ -41,8 +41,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copiar dependencias instaladas desde el builder
 COPY --from=builder /install /install
 
-# Copiar código de la aplicación
-COPY --chown=appuser:appuser . /app
+# Copiar código de la aplicación (solo el contenido de backend/)
+COPY --chown=appuser:appuser backend/ /app
 
 # Cambiar a usuario no-root por seguridad
 USER appuser

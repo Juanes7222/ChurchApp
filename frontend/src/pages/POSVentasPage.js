@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProductCatalog from '../components/POS/ProductCatalog';
 import TicketPanel from '../components/POS/TicketPanel';
@@ -103,6 +103,18 @@ const POSVentasPage = () => {
     }
   }, [currentShift, navigate, shiftChecked]);
 
+  // Definir handleNewTicket antes de usarlo en useEffect
+  const handleNewTicket = useCallback(() => {
+    if (currentTicket && currentTicket.items.length > 0) {
+      if (window.confirm('¿Deseas cancelar la venta actual y crear una nueva?')) {
+        newTicket();
+        toast.success('Nueva venta iniciada');
+      }
+    } else {
+      newTicket();
+    }
+  }, [currentTicket, newTicket]);
+
   // Atajos de teclado
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -126,18 +138,7 @@ const POSVentasPage = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentTicket]);
-
-  const handleNewTicket = () => {
-    if (currentTicket && currentTicket.items.length > 0) {
-      if (window.confirm('¿Deseas cancelar la venta actual y crear una nueva?')) {
-        newTicket();
-        toast.success('Nueva venta iniciada');
-      }
-    } else {
-      newTicket();
-    }
-  };
+  }, [currentTicket, handleNewTicket]);
   
   const handleLogout = () => {
     if (meseroSession) {

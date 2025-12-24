@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -10,11 +10,9 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { 
   DollarSign, 
-  CreditCard, 
   Smartphone,
   Banknote,
   AlertCircle,
@@ -37,7 +35,6 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
   const vendedor = usePOSStore(state => state.vendedor);
   const addPayment = usePOSStore(state => state.addPayment);
   const clearPayments = usePOSStore(state => state.clearPayments);
-  const finalizeSale = usePOSStore(state => state.finalizeSale);
   const newTicket = usePOSStore(state => state.newTicket);
 
   const [selectedMethod, setSelectedMethod] = useState('efectivo');

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePermissions, PERMISSIONS, ROLES } from '../hooks/usePermissions';
 import { Can, HasRole } from '../components/PermissionGuard';
@@ -9,10 +9,7 @@ import usePOSStore from '../stores/posStore';
 import { 
   ShoppingCart, 
   Package, 
-  DollarSign, 
-  TrendingUp,
   Users,
-  Settings,
   FileText,
   Clock,
   AlertCircle,
@@ -21,7 +18,7 @@ import {
 
 const POS = () => {
   const navigate = useNavigate();
-  const { role, hasPermission } = usePermissions();
+  const { role } = usePermissions();
   const currentShift = usePOSStore(state => state.currentShift);
   const loadActiveShift = usePOSStore(state => state.loadActiveShift);
   

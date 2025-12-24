@@ -3,7 +3,7 @@ from models.models import MiembroCreate, MiembroUpdate, MiembroResponse
 from utils import require_auth_user, require_admin
 from utils.auth import require_any_authenticated
 from core import config
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, cast
 from datetime import datetime, timezone
 import uuid
 import os
@@ -19,9 +19,9 @@ async def list_miembros(
     page: int = 1,
     page_size: int = 50,
     current_user: Dict[str, Any] = Depends(require_any_authenticated)
-):
+) -> Dict[str, Any]:
     """List members with search and filters - Accessible by any authenticated user including meseros"""
-    query = supabase.table('miembros').select('*', count='exact').eq('is_deleted', False)
+    query = supabase.table('miembros').select('*', count='exact').eq('is_deleted', False)  # type: ignore
     
     if q:
         # Search by documento, nombres, apellidos
@@ -42,24 +42,24 @@ async def list_miembros(
     }
 
 @api_router.get("/miembros/{miembro_uuid}", response_model=MiembroResponse)
-async def get_miembro(miembro_uuid: str, current_user: Dict[str, Any] = Depends(require_auth_user)):
+async def get_miembro(miembro_uuid: str, current_user: Dict[str, Any] = Depends(require_auth_user)) -> Dict[str, Any]:
     """Get member by UUID"""
     result = supabase.table('miembros').select('*, grupos:grupo_miembro(grupo_uuid, grupos(*))').eq('uuid', miembro_uuid).execute()
     if not result.data:
         raise HTTPException(status_code=404, detail="Miembro no encontrado")
     
-    miembro = result.data[0]
+    miembro = cast(Dict[str, Any], result.data[0])
     
     # Transform grupos relationship
     if miembro.get('grupos'):
-        miembro['grupos'] = [g['grupos'] for g in miembro['grupos'] if g.get('grupos')]
+        miembro['grupos'] = [cast(Dict[str, Any], g).get('grupos') for g in cast(List[Any], miembro['grupos']) if cast(Dict[str, Any], g).get('grupos')]
     else:
         miembro['grupos'] = []
     
     return miembro
 
 @api_router.post("/miembros", response_model=MiembroResponse)
-async def create_miembro(miembro: MiembroCreate, current_user: Dict[str, Any] = Depends(require_auth_user)):
+async def create_miembro(miembro: MiembroCreate, current_user: Dict[str, Any] = Depends(require_auth_user)) -> Dict[str, Any]:
     """Create new member"""
     # Check for duplicate documento
     existing = supabase.table('miembros').select('uuid').eq('documento', miembro.documento).eq('is_deleted', False).execute()
@@ -75,14 +75,14 @@ async def create_miembro(miembro: MiembroCreate, current_user: Dict[str, Any] = 
     
     result = supabase.table('miembros').insert(data).execute()
     print(f"DEBUG - Inserted data: {result.data[0]}")  # Debug log
-    return result.data[0]
+    return cast(Dict[str, Any], result.data[0])
 
 @api_router.put("/miembros/{miembro_uuid}", response_model=MiembroResponse)
 async def update_miembro(
     miembro_uuid: str,
     miembro: MiembroUpdate,
     current_user: Dict[str, Any] = Depends(require_auth_user)
-):
+) -> Dict[str, Any]:
     """Update member"""
     # Check if exists
     existing = supabase.table('miembros').select('uuid').eq('uuid', miembro_uuid).execute()
@@ -96,10 +96,10 @@ async def update_miembro(
     
     result = supabase.table('miembros').update(data).eq('uuid', miembro_uuid).execute()
     print(f"DEBUG - Updated data: {result.data[0]}")  # Debug log
-    return result.data[0]
+    return cast(Dict[str, Any], result.data[0])
 
 @api_router.delete("/miembros/{miembro_uuid}")
-async def delete_miembro(miembro_uuid: str, current_user: Dict[str, Any] = Depends(require_admin)):
+async def delete_miembro(miembro_uuid: str, current_user: Dict[str, Any] = Depends(require_admin)) -> Dict[str, str]:
     """Soft delete member"""
     result = supabase.table('miembros').update({
         'is_deleted': True,
@@ -117,7 +117,7 @@ async def delete_miembro(miembro_uuid: str, current_user: Dict[str, Any] = Depen
 async def create_temporal_miembro(
     miembro: MiembroCreate, 
     current_user: Dict[str, Any] = Depends(require_any_authenticated)
-):
+) -> Dict[str, Any]:
     """Crear cliente temporal - Solo meseros y admin
     
     Los clientes temporales se crean con es_temporal=true y verificado=false
@@ -136,7 +136,7 @@ async def create_temporal_miembro(
     data['updated_by'] = current_user.get('sub')
     
     result = supabase.table('miembros').insert(data).execute()
-    return result.data[0]
+    return cast(Dict[str, Any], result.data[0])
 
 
 @api_router.get("/miembros/temporales/pendientes")
@@ -195,7 +195,7 @@ async def rechazar_miembro_temporal(
     miembro_uuid: str,
     motivo: Optional[str] = None,
     current_user: Dict[str, Any] = Depends(require_admin)
-) -> Dict[str, Any]:
+) -> Dict[str, str]:
     """Rechazar y eliminar un cliente temporal - Solo admin"""
     # Verificar que existe y es temporal
     miembro = supabase.table('miembros')\
@@ -225,7 +225,7 @@ async def rechazar_miembro_temporal(
 async def upload_foto_miembro(
     file: UploadFile = File(...),
     current_user: Dict[str, Any] = Depends(require_auth_user)
-):
+) -> Dict[str, str]:
     """Upload member photo to Supabase Storage"""
     # Validate file type
     allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]
@@ -238,7 +238,8 @@ async def upload_foto_miembro(
         raise HTTPException(status_code=400, detail="Archivo muy grande. Máximo 5MB")
     
     # Generate unique filename
-    file_ext = os.path.splitext(file.filename)[1]
+    filename = file.filename or "upload"
+    file_ext = os.path.splitext(filename)[1]
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     
     # Bucket name
@@ -263,7 +264,7 @@ async def upload_foto_miembro(
         raise HTTPException(status_code=500, detail=f"Error al subir archivo: {str(e)}")
 
 @api_router.get("/miembros/storage-check")
-async def check_storage_bucket(current_user: Dict[str, Any] = Depends(require_auth_user)):
+async def check_storage_bucket(current_user: Dict[str, Any] = Depends(require_auth_user)) -> Dict[str, Any]:
     """Check if storage bucket exists and is accessible"""
     bucket_name = config.STORAGE_NAME
     try:

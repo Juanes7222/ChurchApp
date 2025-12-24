@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -32,11 +32,7 @@ const GrupoDetalle = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    loadGrupo();
-  }, [id]);
-
-  const loadGrupo = async () => {
+  const loadGrupo = useCallback(async () => {
     try {
       const response = await api.get(`/grupos/${id}`);
       setGrupo(response.data);
@@ -47,7 +43,11 @@ const GrupoDetalle = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate]);
+
+  useEffect(() => {
+    loadGrupo();
+  }, [loadGrupo]);
 
   const handleDelete = async () => {
     setDeleting(true);

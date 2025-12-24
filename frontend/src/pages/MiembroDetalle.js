@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -18,8 +18,6 @@ import {
   Phone, 
   Mail, 
   MapPin, 
-  Calendar, 
-  User,
   FileText,
   Loader2,
   MessageSquare,
@@ -41,11 +39,7 @@ const MiembroDetalle = () => {
   const [savingObs, setSavingObs] = useState(false);
   const [showFoto, setShowFoto] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, [id]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [miembroRes, obsRes] = await Promise.all([
         api.get(`/miembros/${id}`),
@@ -53,7 +47,6 @@ const MiembroDetalle = () => {
       ]);
       setMiembro(miembroRes.data);
       setObservaciones(obsRes.data.observaciones);
-      console.log('Miembro data loaded:', miembroRes.data);
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Error al cargar datos del miembro');
@@ -61,7 +54,11 @@ const MiembroDetalle = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleAddObservacion = async (e) => {
     e.preventDefault();
@@ -364,13 +361,10 @@ const MiembroDetalle = () => {
                 src={miembro.foto_url}
                 alt={`${miembro.nombres} ${miembro.apellidos}`}
                 className="max-w-full max-h-[70vh] object-contain rounded-lg"
-                onError={(e) => {
+                onError={(_) => {
                   console.error('Error cargando imagen:', miembro.foto_url);
                   toast.error(`Error al cargar la imagen. URL: ${miembro.foto_url}`);
                   setShowFoto(false);
-                }}
-                onLoad={() => {
-                  console.log('Imagen cargada exitosamente:', miembro.foto_url);
                 }}
               />
             ) : (

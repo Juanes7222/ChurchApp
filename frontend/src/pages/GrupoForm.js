@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Button } from '../components/ui/button';
@@ -37,13 +37,7 @@ const GrupoForm = () => {
   const activoValue = watch('activo');
   const privacidadValue = watch('privacidad');
 
-  useEffect(() => {
-    if (isEdit) {
-      loadGrupo();
-    }
-  }, [id]);
-
-  const loadGrupo = async () => {
+  const loadGrupo = useCallback(async () => {
     try {
       const response = await api.get(`/grupos/${id}`);
       const grupo = response.data;
@@ -60,7 +54,13 @@ const GrupoForm = () => {
     } finally {
       setLoadingData(false);
     }
-  };
+  }, [id, setValue, navigate]);
+
+  useEffect(() => {
+    if (isEdit) {
+      loadGrupo();
+    }
+  }, [isEdit, loadGrupo]);
 
   const onSubmit = async (data) => {
     setLoading(true);

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { CanAccessSection } from './PermissionGuard';
@@ -9,7 +9,6 @@ import {
   LayoutDashboard, 
   Users, 
   UsersRound, 
-  Settings, 
   LogOut,
   Menu,
   X,

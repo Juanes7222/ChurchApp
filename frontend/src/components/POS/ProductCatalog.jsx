@@ -20,15 +20,27 @@ const ProductCatalog = () => {
   const [selectedCategory, setSelectedCategory] = useState('todos');
   const addItem = usePOSStore(state => state.addItem);
 
-  // Cargar productos
+  // Cargar todos los productos una sola vez
   const { data: productos = [], isLoading: loadingProductos } = useQuery({
-    queryKey: ['productos', selectedCategory, searchQuery],
-    queryFn: () => fetchProductos({
-      categoria_uuid: selectedCategory !== 'todos' ? selectedCategory : undefined,
-      q: searchQuery || undefined,
-      activo: true,
-    }),
+    queryKey: ['productos'],
+    queryFn: () => fetchProductos({ activo: true }),
     staleTime: 5 * 60 * 1000, // 5 minutos
+  });
+
+  // Filtrar productos en el frontend
+  const filteredProductos = productos.filter((p) => {
+    // Filtro de búsqueda
+    const matchesSearch = !searchQuery || 
+      p.nombre?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.codigo?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Filtro de categoría/favoritos
+    const matchesCategory = 
+      selectedCategory === 'todos' ||
+      (selectedCategory === 'favoritos' && p.favorito) ||
+      (selectedCategory !== 'favoritos' && selectedCategory !== 'todos' && p.categoria_uuid === selectedCategory);
+    
+    return matchesSearch && matchesCategory;
   });
 
   // Cargar categorías
@@ -38,14 +50,11 @@ const ProductCatalog = () => {
     staleTime: 10 * 60 * 1000, // 10 minutos
   });
 
-  // Productos favoritos
-  const productosFavoritos = productos.filter(p => p.favorito);
-
   const handleProductClick = (producto) => {
     try {
       addItem(producto, 1);
       toast.success(`${producto.nombre} agregado`);
-    } catch (error) {
+    } catch {
       toast.error('Error al agregar producto');
     }
   };
@@ -110,14 +119,18 @@ const ProductCatalog = () => {
           {/* Favoritos */}
           <TabsContent value="favoritos" className="flex-1 mt-2 sm:mt-4">
             <ScrollArea className="h-[calc(100vh-240px)] sm:h-[calc(100vh-300px)]">
-              {productosFavoritos.length === 0 ? (
+              {loadingProductos ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : filteredProductos.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Star className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 opacity-20" />
                   <p className="text-xs sm:text-sm">No hay productos favoritos</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-                  {productosFavoritos.map((producto) => (
+                  {filteredProductos.map((producto) => (
                     <ProductCard
                       key={producto.uuid}
                       producto={producto}
@@ -136,14 +149,14 @@ const ProductCatalog = () => {
                 <div className="flex justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
-              ) : productos.length === 0 ? (
+              ) : filteredProductos.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Package className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 opacity-20" />
                   <p className="text-xs sm:text-sm">No se encontraron productos</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-                  {productos.map((producto) => (
+                  {filteredProductos.map((producto) => (
                     <ProductCard
                       key={producto.uuid}
                       producto={producto}
@@ -163,14 +176,14 @@ const ProductCatalog = () => {
                   <div className="flex justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   </div>
-                ) : productos.length === 0 ? (
+                ) : filteredProductos.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <Package className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 opacity-20" />
                     <p className="text-xs sm:text-sm">No hay productos en esta categoría</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-                    {productos.map((producto) => (
+                    {filteredProductos.map((producto) => (
                       <ProductCard
                         key={producto.uuid}
                         producto={producto}

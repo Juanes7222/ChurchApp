@@ -68,13 +68,30 @@ async def create_producto(
         if producto.precio < 0:
             raise HTTPException(status_code=400, detail="El precio debe ser mayor o igual a 0")
         
-        # Verificar código único si existe
-        if producto.codigo:
-            existing = supabase.table('productos').select('uuid').eq('codigo', producto.codigo).eq('is_deleted', False).execute()
+        data = producto.model_dump()
+        
+        # Generar código automáticamente si no se proporciona
+        if not data.get('codigo') or data['codigo'].strip() == '':
+            # Obtener el último número de código usado
+            last_product = supabase.table('productos').select('codigo').eq('is_deleted', False).order('created_at', desc=True).limit(1).execute()
+            
+            next_number = 1
+            if last_product.data and last_product.data[0].get('codigo'):
+                last_code = last_product.data[0]['codigo']
+                # Intentar extraer el número del código (formato: PRD-001, PROD-123, etc.)
+                import re
+                match = re.search(r'(\d+)$', last_code)
+                if match:
+                    next_number = int(match.group(1)) + 1
+            
+            # Generar código con formato PRD-XXX (3 dígitos con padding de ceros)
+            data['codigo'] = f"PRD-{next_number:03d}"
+        else:
+            # Si se proporciona código, verificar que sea único
+            existing = supabase.table('productos').select('uuid').eq('codigo', data['codigo']).eq('is_deleted', False).execute()
             if existing.data:
                 raise HTTPException(status_code=400, detail="Ya existe un producto con ese código")
         
-        data = producto.model_dump()
         # Generar UUID para el nuevo producto
         data['uuid'] = str(uuid_lib.uuid4())
         # Convertir Decimal a float para JSON serialization

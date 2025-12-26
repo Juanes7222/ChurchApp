@@ -154,7 +154,7 @@ const POSProductos = () => {
       setEditingProduct(null);
       setFormData({
         nombre: '',
-        codigo: '',
+        codigo: '', // Se generará automáticamente en el backend
         descripcion: '',
         precio: '',
         categoria_uuid: '',
@@ -334,16 +334,28 @@ const POSProductos = () => {
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              {editingProduct && (
                 <div className="space-y-2">
                   <Label htmlFor="codigo">Código</Label>
                   <Input
                     id="codigo"
-                    placeholder="PRD-001"
                     value={formData.codigo}
-                    onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+                    disabled
+                    className="bg-gray-50"
                   />
+                  <p className="text-xs text-gray-500">El código no se puede modificar</p>
                 </div>
+              )}
+              
+              {/* {!editingProduct && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    El código se generará automáticamente (ej: PRD-001, PRD-002, etc.)
+                  </p>
+                </div>
+              )} */}
+              
+              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="precio">Precio *</Label>
                   <Input

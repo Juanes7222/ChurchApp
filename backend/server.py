@@ -34,22 +34,24 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
-api_router = APIRouter(prefix="/api")
+api_router = APIRouter()
 
 
 # ============= ROOT =============
+@api_router.head("/")
 @api_router.get("/")
 async def root():
     return {"message": "Sistema Iglesia API v1.0", "status": "running"}
 
+@api_router.head("/")
 @api_router.get("/health")
 async def health():
     return {"status": "healthy"}
 
-app.include_router(files_router, prefix="/api")
 
 # Include router
-app.include_router(api_router, prefix="/api")
+app.include_router(api_router)
+app.include_router(files_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(miembros_router, prefix="/api")

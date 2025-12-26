@@ -159,40 +159,40 @@ const POSCuentas = () => {
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Users className="h-8 w-8 text-blue-600" />
-              <div>
-                <p className="text-2xl font-bold">{cuentas.length}</p>
-                <p className="text-sm text-gray-600">Cuentas</p>
+          <CardContent className="pt-4 sm:pt-6">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Users className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xl sm:text-2xl font-bold truncate">{cuentas.length}</p>
+                <p className="text-xs sm:text-sm text-gray-600">Cuentas Activas</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="h-8 w-8 text-red-600" />
-              <div>
-                <p className="text-2xl font-bold">
+          <CardContent className="pt-4 sm:pt-6">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <AlertCircle className="h-6 w-6 sm:h-8 sm:w-8 text-red-600 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xl sm:text-2xl font-bold">
                   {cuentas.filter(c => (c.saldo_deudor || 0) > 0).length}
                 </p>
-                <p className="text-sm text-gray-600">Con saldo pendiente</p>
+                <p className="text-xs sm:text-sm text-gray-600">Con Saldo</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <DollarSign className="h-8 w-8 text-green-600" />
-              <div>
-                <p className="text-2xl font-bold">
-                  ${cuentas.reduce((sum, c) => sum + (c.saldo_deudor || 0), 0).toFixed(2)}
+        <Card className="sm:col-span-2 lg:col-span-1">
+          <CardContent className="pt-4 sm:pt-6">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xl sm:text-2xl font-bold text-red-600 truncate">
+                  ${cuentas.reduce((sum, c) => sum + (c.saldo_deudor || 0), 0).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
                 </p>
-                <p className="text-sm text-gray-600">Total adeudado</p>
+                <p className="text-xs sm:text-sm text-gray-600">Total Adeudado</p>
               </div>
             </div>
           </CardContent>
@@ -238,95 +238,150 @@ const POSCuentas = () => {
               No se encontraron cuentas
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Miembro</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cuentas.map((cuenta) => (
-                  <TableRow key={cuenta.uuid || cuenta.miembro_uuid}>
-                    <TableCell className="font-medium">
-                      {getMiembroNombre(cuenta)}
-                    </TableCell>
-                    
-                   
-                    <TableCell>
-                      {(cuenta.saldo_deudor || 0) > 0 ? (
-                        <Badge variant="destructive">Con saldo</Badge>
-                      ) : (
-                        <Badge variant="secondary">Al día</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleVerDetalle(cuenta)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {(cuenta.saldo_deudor || 0) > 0 && (
-                          <Button 
-                            size="sm"
-                            onClick={() => handleAbrirAbono(cuenta)}
-                          >
-                            <CreditCard className="h-4 w-4 mr-1" />
-                            Abonar
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Miembro</TableHead>
+                    <TableHead className="text-right">Saldo Pendiente</TableHead>
+                    <TableHead className="hidden sm:table-cell">Límite Crédito</TableHead>
+                    <TableHead className="hidden sm:table-cell">Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {cuentas.map((cuenta) => {
+                    const saldo = cuenta.saldo_deudor || 0;
+                    const limite = cuenta.limite_credito || 300000;
+                    const porcentaje = limite > 0 ? (saldo / limite) * 100 : 0;
+                    
+                    return (
+                      <TableRow key={cuenta.uuid || cuenta.miembro_uuid}>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{getMiembroNombre(cuenta)}</span>
+                            {cuenta.miembros?.documento && (
+                              <span className="text-xs text-gray-500">Doc: {cuenta.miembros.documento}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-col items-end">
+                            <span className={`font-bold text-base ${
+                              saldo > 0 ? 'text-red-600' : 'text-green-600'
+                            }`}>
+                              ${saldo.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+                            </span>
+                            {saldo > 0 && (
+                              <span className="text-xs text-gray-500">
+                                {porcentaje.toFixed(0)}% usado
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell text-gray-600">
+                          ${limite.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          {saldo > 0 ? (
+                            <Badge variant="destructive" className="whitespace-nowrap">
+                              Con saldo
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">Al día</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1 sm:gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleVerDetalle(cuenta)}
+                              className="h-8 w-8 p-0 sm:w-auto sm:px-3"
+                            >
+                              <Eye className="h-4 w-4" />
+                              <span className="hidden sm:inline ml-1">Ver</span>
+                            </Button>
+                            {saldo > 0 && (
+                              <Button 
+                                size="sm"
+                                onClick={() => handleAbrirAbono(cuenta)}
+                                className="h-8 whitespace-nowrap"
+                              >
+                                <CreditCard className="h-4 w-4 mr-1" />
+                                <span className="hidden sm:inline">Abonar</span>
+                                <span className="sm:hidden">$</span>
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
 
       {/* Modal de abono */}
       <Dialog open={showAbonoModal} onOpenChange={setShowAbonoModal}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-green-600" />
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
               Registrar Abono
             </DialogTitle>
-            <DialogDescription>
-              {selectedCuenta && getMiembroNombre(selectedCuenta)}
-              <br />
-              Saldo actual: <span className="font-bold text-red-600">
-                ${(selectedCuenta?.saldo_deudor || 0).toFixed(2)}
-              </span>
+            <DialogDescription className="text-sm">
+              <div className="mt-2 p-3 bg-gray-50 rounded-lg border">
+                <p className="font-medium text-gray-900">{selectedCuenta && getMiembroNombre(selectedCuenta)}</p>
+                {selectedCuenta?.miembros?.documento && (
+                  <p className="text-xs text-gray-600 mt-1">Doc: {selectedCuenta.miembros.documento}</p>
+                )}
+                <div className="mt-3 pt-3 border-t">
+                  <p className="text-xs text-gray-600">Saldo actual:</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    ${(selectedCuenta?.saldo_deudor || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+                  </p>
+                </div>
+              </div>
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
             <div>
-              <Label htmlFor="monto">Monto del Abono *</Label>
-              <div className="relative mt-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+              <Label htmlFor="monto" className="text-sm">Monto del Abono *</Label>
+              <div className="relative mt-1.5">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-base font-medium">$</span>
                 <Input
                   id="monto"
                   type="number"
-                  step="0.01"
-                  min="0.01"
+                  step="1"
+                  min="1"
                   max={selectedCuenta?.saldo_deudor || 0}
                   value={abonoForm.monto}
                   onChange={(e) => setAbonoForm({ ...abonoForm, monto: e.target.value })}
-                  className="pl-8"
-                  placeholder="0.00"
+                  className="pl-8 text-base sm:text-lg font-medium h-11 sm:h-12"
+                  placeholder="0"
+                  autoFocus
                 />
               </div>
               {selectedCuenta && (
-                <p className="text-sm text-gray-500 mt-1">
-                  Máximo: ${(selectedCuenta.saldo_deudor || 0).toFixed(2)}
-                </p>
+                <div className="mt-2 flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Máximo:</span>
+                  <span className="font-medium">${(selectedCuenta.saldo_deudor || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 })}</span>
+                </div>
+              )}
+              {abonoForm.monto && parseFloat(abonoForm.monto) > 0 && selectedCuenta && (
+                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-green-700">Nuevo saldo:</span>
+                    <span className="font-bold text-green-700">
+                      ${Math.max(0, (selectedCuenta.saldo_deudor || 0) - parseFloat(abonoForm.monto)).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
 

@@ -176,6 +176,7 @@ class PagoVenta(BaseModel):
     metodo: str
     monto: Decimal
     referencia: Optional[str] = None
+    comprobante_url: Optional[str] = None
 
 class Venta(BaseModel):
     client_ticket_id: Optional[str] = None

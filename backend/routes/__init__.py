@@ -11,6 +11,7 @@ from .pos_meseros import pos_meseros_router
 from .pos_productos import pos_productos_router
 from .pos_shifts import pos_shifts_router
 from .pos_ventas import pos_ventas_router
+from .files import files_router
 
 __all__ = [
     "admin_router",
@@ -25,5 +26,6 @@ __all__ = [
       "pos_meseros_router",
       "pos_productos_router",
       "pos_shifts_router",
-      "pos_ventas_router"
+      "pos_ventas_router",
+      "files_router"
 ]

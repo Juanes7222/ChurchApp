@@ -45,6 +45,8 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
   const [loadingMiembros, setLoadingMiembros] = useState(false);
   const [isFiado, setIsFiado] = useState(false);
   const [showRegistroTemporal, setShowRegistroTemporal] = useState(false);
+  const [imagenTransferencia, setImagenTransferencia] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const total = currentTicket?.total || 0;
   const vuelto = montoRecibido ? parseFloat(montoRecibido) - total : 0;
@@ -60,6 +62,7 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
       setMiembros([]);
       setSelectedMiembro(null);
       setIsFiado(false);
+      setImagenTransferencia(null);
       clearPayments();
     }
   }, [open, clearPayments]);
@@ -141,7 +144,7 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
     },
   });
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     if (!currentTicket || currentTicket.items.length === 0) {
       toast.error('No hay items en el ticket');
       return;
@@ -171,18 +174,40 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
           toast.error('El monto recibido debe ser mayor o igual al total');
           return;
         }
-      } else {
-        // Transferencia
-        if (!referencia || referencia.trim() === '') {
-          toast.error('Ingresa el número de referencia');
-          return;
-        }
+      }
+      // Para transferencia ya no validamos referencia obligatoria
+    }
+
+    let imagenUrl = null;
+
+    // Si hay imagen de transferencia, subirla primero
+    if (imagenTransferencia && selectedMethod === 'transferencia') {
+      setUploadingImage(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', imagenTransferencia);
+        formData.append('bucket', 'transferencias');
+        
+        const uploadResponse = await api.post('upload-image', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        
+        imagenUrl = uploadResponse.data.url;
+      } catch (error) {
+        console.error('Error al subir imagen:', error);
+        toast.error('Error al subir la imagen de transferencia');
+        setUploadingImage(false);
+        return;
+      } finally {
+        setUploadingImage(false);
       }
     }
 
     // Agregar pago al ticket
     const montoPago = selectedMethod === 'efectivo' ? parseFloat(montoRecibido) : total;
-    addPayment(selectedMethod, montoPago, referencia || null);
+    addPayment(selectedMethod, montoPago, imagenUrl || referencia || null);
 
     // Preparar datos de venta
     const ventaData = {
@@ -203,6 +228,7 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
         metodo: selectedMethod,
         monto: parseFloat(montoPago),
         referencia: referencia || null,
+        comprobante_url: imagenUrl || null,
       }],
     };
 
@@ -283,7 +309,6 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
                         key={miembro.uuid}
                         className="w-full text-left p-2 hover:bg-gray-100 border-b last:border-b-0"
                         onClick={() => {
-                          console.log('Miembro seleccionado:', miembro);
                           setSelectedMiembro(miembro);
                           setSearchMiembro('');
                           setMiembros([]);
@@ -409,18 +434,58 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
               )}
 
               {selectedMethod === 'transferencia' && (
-                <div>
-                  <Label htmlFor="referencia">Número de Referencia</Label>
-                  <Input
-                    id="referencia"
-                    type="text"
-                    placeholder="Últimos 4 dígitos o código"
-                    value={referencia}
-                    onChange={(e) => setReferencia(e.target.value)}
-                    autoFocus
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Ingresa el código de autorización
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="imagen-transferencia" className="text-xs sm:text-sm mb-2 block">
+                      Comprobante de Transferencia (Opcional)
+                    </Label>
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-purple-400 transition-colors">
+                      <input
+                        id="imagen-transferencia"
+                        type="file"
+                        accept="image/*,application/pdf"
+                        capture="environment"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setImagenTransferencia(file);
+                            toast.success('Archivo seleccionado');
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="imagen-transferencia"
+                        className="flex flex-col items-center cursor-pointer"
+                      >
+                        <Smartphone className="h-8 w-8 text-gray-400 mb-2" />
+                        <span className="text-sm text-gray-600 text-center">
+                          {imagenTransferencia ? (
+                            <span className="text-purple-600 font-medium">
+                              {imagenTransferencia.name}
+                            </span>
+                          ) : (
+                            <>
+                              Toca aquí para tomar una foto o seleccionar una imagen
+                            </>
+                          )}
+                        </span>
+                      </label>
+                    </div>
+                    {imagenTransferencia && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setImagenTransferencia(null)}
+                        className="mt-2 text-red-600 hover:text-red-700"
+                      >
+                        Eliminar archivo
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Puedes tomar una foto del comprobante o subir una imagen desde tu galería.
                   </p>
                 </div>
               )}
@@ -461,12 +526,14 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
             <Button
               onClick={handleConfirmPayment}
               className="flex-1 bg-green-600 hover:bg-green-700 h-11 sm:h-12"
-              disabled={isPending}
+              disabled={isPending || uploadingImage}
             >
-              {isPending ? (
+              {isPending || uploadingImage ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                  <span className="text-sm sm:text-base">Procesando...</span>
+                  <span className="text-sm sm:text-base">
+                    {uploadingImage ? 'Subiendo imagen...' : 'Procesando...'}
+                  </span>
                 </>
               ) : (
                 <>

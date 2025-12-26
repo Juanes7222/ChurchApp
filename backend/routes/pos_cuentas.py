@@ -363,6 +363,9 @@ async def registrar_abono(
                 saldo_real += monto_mov
             elif tipo == 'pago':
                 saldo_real -= monto_mov
+            elif tipo == 'ajuste':
+                # Los ajustes pueden ser positivos o negativos
+                saldo_real += monto_mov
         
         if float(monto) > saldo_real:
             raise HTTPException(

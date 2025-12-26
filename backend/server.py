@@ -5,7 +5,8 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from core import config
 from routes import (
     admin_router, auth_router, miembros_router, observaciones_router, grupos_router, dashboard_router,
-    pos_reportes_router
+    pos_reportes_router, pos_inventario_router, pos_meseros_router, pos_shifts_router, pos_ventas_router, pos_cuentas_router,
+    files_router
 )
 from routes.pos_productos import pos_productos_router
 from routes.pos_ventas import pos_ventas_router
@@ -18,7 +19,6 @@ import os
 import logging
 import time
 from starlette.requests import Request
-from starlette.responses import Response
 
 logging.basicConfig(
        level=getattr(logging, config.log_level.upper()),
@@ -45,6 +45,8 @@ async def root():
 @api_router.get("/health")
 async def health():
     return {"status": "healthy"}
+
+app.include_router(files_router, prefix="/api")
 
 # Include router
 app.include_router(api_router, prefix="/api")

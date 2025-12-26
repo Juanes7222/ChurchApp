@@ -140,21 +140,54 @@ async def create_temporal_miembro(
     
     Los clientes temporales se crean con es_temporal=true y verificado=false
     Un administrador debe verificarlos posteriormente
+    Si no se provee documento, se genera automáticamente con formato TEMP-XXXXXX
     """
-    # Verificar que no exista el documento
-    existing = supabase.table('miembros').select('uuid').eq('documento', miembro.documento).eq('is_deleted', False).execute()
-    if existing.data:
-        raise HTTPException(status_code=409, detail="Ya existe un cliente con este documento")
-    
     data = miembro.model_dump()
+    
+    # Si no hay documento, generar uno automático
+    if not data.get('documento') or data['documento'].strip() == '':
+        # Generar documento temporal único
+        import time
+        timestamp = int(time.time() * 1000) % 1000000  # Últimos 6 dígitos del timestamp
+        documento_temporal = f"TEMP-{timestamp:06d}"
+        
+        # Verificar que no exista (muy poco probable)
+        existing = supabase.table('miembros').select('uuid').eq('documento', documento_temporal).eq('is_deleted', False).execute()
+        if existing.data:
+            # Si por casualidad existe, agregar un número aleatorio
+            import random
+            documento_temporal = f"TEMP-{random.randint(100000, 999999)}"
+        
+        data['documento'] = documento_temporal
+        data['tipo_documento'] = 'TEMP'
+    else:
+        # Verificar que no exista el documento
+        existing = supabase.table('miembros').select('uuid').eq('documento', miembro.documento).eq('is_deleted', False).execute()
+        if existing.data:
+            raise HTTPException(status_code=409, detail="Ya existe un cliente con este documento")
+    
     data['uuid'] = str(uuid.uuid4())  # Generar UUID
     data['es_temporal'] = True
     data['verificado'] = False
+    data['otra_iglesia'] = False
+    data['public_profile'] = False
     data['created_by'] = current_user.get('sub')
     data['updated_by'] = current_user.get('sub')
     
     result = supabase.table('miembros').insert(data).execute()
-    return cast(Dict[str, Any], result.data[0])
+    miembro_creado = cast(Dict[str, Any], result.data[0])
+    
+    # Crear cuenta automáticamente para el miembro temporal
+    cuenta_data = {
+        'uuid': str(uuid.uuid4()),
+        'miembro_uuid': miembro_creado['uuid'],
+        'saldo_deudor': 0,
+        'saldo_acumulado': 0,
+        'limite_credito': 300000  # Límite por defecto
+    }
+    supabase.table('cuentas_miembro').insert(cuenta_data).execute()
+    
+    return miembro_creado
 
 
 @api_router.get("/miembros/temporales/pendientes")

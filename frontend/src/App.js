@@ -331,7 +331,7 @@ function App() {
         </Routes>
       </Suspense>
       </BrowserRouter>
-      <Toaster position="top-right" richColors />
+      <Toaster position="bottom-right" richColors />
     </AuthProvider>
     </QueryClientProvider>
     </ErrorBoundary>

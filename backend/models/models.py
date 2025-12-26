@@ -56,7 +56,7 @@ class ConsumeInviteRequest(BaseModel):
     google_token: str  # Token de Firebase/Google
 
 class MiembroCreate(BaseModel):
-    documento: str
+    documento: Optional[str] = None
     tipo_documento: Optional[str] = "CC"
     nombres: str
     apellidos: str

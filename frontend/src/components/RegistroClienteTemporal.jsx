@@ -23,10 +23,8 @@ import { getErrorMessage } from '../lib/utils';
 const RegistroClienteTemporal = ({ open, onOpenChange, onClienteCreado }) => {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
-    documento: '',
     nombres: '',
     apellidos: '',
-    telefono: '',
   });
 
   const crearClienteMutation = useMutation({
@@ -40,10 +38,8 @@ const RegistroClienteTemporal = ({ open, onOpenChange, onClienteCreado }) => {
       
       // Resetear formulario
       setFormData({
-        documento: '',
         nombres: '',
         apellidos: '',
-        telefono: '',
       });
       
       // Notificar al componente padre
@@ -61,10 +57,8 @@ const RegistroClienteTemporal = ({ open, onOpenChange, onClienteCreado }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     crearClienteMutation.mutate({
-      ...formData,
-      tipo_documento: 'CC',
-      otra_iglesia: false,
-      public_profile: false,
+      nombres: formData.nombres,
+      apellidos: formData.apellidos,
     });
   };
 
@@ -86,19 +80,6 @@ const RegistroClienteTemporal = ({ open, onOpenChange, onClienteCreado }) => {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="documento">Documento *</Label>
-            <Input
-              id="documento"
-              type="text"
-              placeholder="Número de documento"
-              value={formData.documento}
-              onChange={(e) => handleChange('documento', e.target.value)}
-              required
-              autoFocus
-            />
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="nombres">Nombres *</Label>
@@ -109,6 +90,7 @@ const RegistroClienteTemporal = ({ open, onOpenChange, onClienteCreado }) => {
                 value={formData.nombres}
                 onChange={(e) => handleChange('nombres', e.target.value)}
                 required
+                autoFocus
               />
             </div>
 
@@ -123,17 +105,6 @@ const RegistroClienteTemporal = ({ open, onOpenChange, onClienteCreado }) => {
                 required
               />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="telefono">Teléfono</Label>
-            <Input
-              id="telefono"
-              type="tel"
-              placeholder="Número de teléfono"
-              value={formData.telefono}
-              onChange={(e) => handleChange('telefono', e.target.value)}
-            />
           </div>
 
           <div className="flex items-start gap-2 text-sm text-yellow-700 bg-yellow-50 p-3 rounded-md">

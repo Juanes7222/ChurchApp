@@ -8,8 +8,6 @@ import { Badge } from '../components/ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { 
   ArrowLeft, 
-  User, 
-  Clock,
   AlertTriangle
 } from 'lucide-react';
 import usePOSStore from '../stores/posStore';
@@ -167,7 +165,7 @@ const POSVentasPage = () => {
 
   const handlePaymentSuccess = (venta) => {
     toast.success('Venta procesada exitosamente', {
-      description: `Ticket #${venta.numero_ticket}`,
+      description: `Ticket #${venta.venta.numero_ticket}`,
     });
     setShowPaymentModal(false);
   };
@@ -217,13 +215,13 @@ const POSVentasPage = () => {
               variant="ghost"
               size="icon"
               onClick={handleLogout}
-              title={meseroSession ? "Cerrar sesión" : "Volver al POS"}
+              title={meseroSession ? "Cerrar sesión" : "Volver al inicio"}
               className="flex-shrink-0"
             >
               <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-xl font-bold truncate">POS</h1>
+              <h1 className="text-base sm:text-xl font-bold truncate">Caja</h1>
               <p className="text-xs sm:text-sm text-gray-500 truncate">
                 {currentUserName}
               </p>

@@ -83,6 +83,7 @@ async def get_cuenta_miembro(
         # Calcular estadísticas
         total_cargos = 0
         total_pagos = 0
+        total_ajustes = 0
         saldo_calculado = 0
         
         for mov_data in (todos_movimientos.data or []):
@@ -96,6 +97,10 @@ async def get_cuenta_miembro(
             elif tipo == 'pago':
                 total_pagos += monto
                 saldo_calculado -= monto
+            elif tipo == 'ajuste':
+                total_ajustes += monto
+                # Los ajustes pueden ser positivos (aumentan deuda) o negativos (disminuyen deuda)
+                saldo_calculado += monto
         
         # Actualizar saldo si difiere
         if abs(saldo_calculado - float(cuenta.get('saldo_deudor', 0))) > 0.01:
@@ -142,14 +147,126 @@ async def get_movimientos_cuenta(
         movimientos_result = supabase.table('movimientos_cuenta').select('*').eq('cuenta_uuid', cuenta_uuid).eq('is_deleted', False).execute()
         
         ventas_pagadas_result = supabase.table('ventas').select(
-            'uuid, total, created_at, numero_ticket, is_fiado'
+            'uuid, total, created_at, numero_ticket, is_fiado, vendedor_uuid'
         ).eq('miembro_uuid', miembro_uuid).eq('is_fiado', False).eq('is_deleted', False).execute()
+        
+        # Recopilar todos los venta_uuid únicos de movimientos
+        venta_uuids = set()
+        for mov_data in (movimientos_result.data or []):
+            mov = cast(Dict[str, Any], mov_data)
+            venta_uuid = mov.get('venta_uuid')
+            if venta_uuid:
+                venta_uuids.add(venta_uuid)
+        
+        # Obtener vendedor_uuid de todas las ventas en UNA sola query
+        ventas_vendedores = {}
+        if venta_uuids:
+            ventas_info_result = supabase.table('ventas').select(
+                'uuid, vendedor_uuid'
+            ).in_('uuid', list(venta_uuids)).execute()
+            
+            for venta_data in (ventas_info_result.data or []):
+                venta = cast(Dict[str, Any], venta_data)
+                ventas_vendedores[venta.get('uuid')] = venta.get('vendedor_uuid')
+        
+        # Recopilar todos los vendedor_uuids únicos
+        vendedor_uuids = set()
+        for vendedor_uuid in ventas_vendedores.values():
+            if vendedor_uuid:
+                vendedor_uuids.add(vendedor_uuid)
+        
+        for venta_data in (ventas_pagadas_result.data or []):
+            vendedor_uuid = venta_data.get('vendedor_uuid')
+            if vendedor_uuid:
+                vendedor_uuids.add(vendedor_uuid)
+        
+        # Agregar created_by_uuid SOLO de movimientos tipo pago/ajuste (no cargo)
+        # Los cargos ya tienen su vendedor desde la venta asociada
+        for mov_data in (movimientos_result.data or []):
+            mov = cast(Dict[str, Any], mov_data)
+            created_by = mov.get('created_by_uuid')
+            tipo = mov.get('tipo')
+            # Solo agregar created_by para pagos y ajustes (operaciones admin)
+            if created_by and tipo in ('pago', 'ajuste'):
+                vendedor_uuids.add(created_by)
+        
+        # Buscar información de todos en miembros primero
+        vendedores_info = {}
+        if vendedor_uuids:
+            # Obtener nombres de miembros
+            miembros_result = supabase.table('miembros').select(
+                'uuid, nombres, apellidos'
+            ).in_('uuid', list(vendedor_uuids)).execute()
+            
+            # Obtener UUIDs de meseros (usuarios_temporales) con su miembro_uuid
+            meseros_result = supabase.table('usuarios_temporales').select(
+                'uuid, miembro_uuid'
+            ).in_('uuid', list(vendedor_uuids)).execute()
+            
+            # Mapear UUID de mesero -> miembro_uuid para buscar nombres
+            meseros_uuids = set()
+            mesero_to_miembro = {}
+            miembro_uuids_adicionales = set()
+            
+            for mesero_data in (meseros_result.data or []):
+                mesero = cast(Dict[str, Any], mesero_data)
+                uuid = mesero.get('uuid')
+                miembro_uuid = mesero.get('miembro_uuid')
+                if uuid:
+                    meseros_uuids.add(uuid)
+                    if miembro_uuid:
+                        mesero_to_miembro[uuid] = miembro_uuid
+                        miembro_uuids_adicionales.add(miembro_uuid)
+            
+            # Si hay meseros, buscar sus nombres en miembros por miembro_uuid
+            meseros_nombres_dict = {}
+            if miembro_uuids_adicionales:
+                meseros_nombres_result = supabase.table('miembros').select(
+                    'uuid, nombres, apellidos'
+                ).in_('uuid', list(miembro_uuids_adicionales)).execute()
+                
+                # Crear diccionario miembro_uuid -> nombre para meseros
+                for miembro_data in (meseros_nombres_result.data or []):
+                    miembro = cast(Dict[str, Any], miembro_data)
+                    miembro_uuid = miembro.get('uuid')
+                    if miembro_uuid:
+                        nombre = f"{miembro.get('nombres', '')} {miembro.get('apellidos', '')}".strip()
+                        meseros_nombres_dict[miembro_uuid] = nombre
+            
+            # Crear diccionario de miembros por UUID (para admins que están en miembros)
+            miembros_dict = {}
+            for miembro_data in (miembros_result.data or []):
+                miembro = cast(Dict[str, Any], miembro_data)
+                uuid = miembro.get('uuid')
+                if uuid:
+                    nombre = f"{miembro.get('nombres', '')} {miembro.get('apellidos', '')}".strip()
+                    miembros_dict[uuid] = nombre
+            
+            # Procesar TODOS los vendedor_uuids
+            for vendedor_uuid in vendedor_uuids:
+                # Si está en usuarios_temporales, es mesero
+                if vendedor_uuid in meseros_uuids:
+                    # Buscar su nombre usando miembro_uuid
+                    miembro_uuid = mesero_to_miembro.get(vendedor_uuid)
+                    nombre = meseros_nombres_dict.get(miembro_uuid, 'Mesero Desconocido')
+                    vendedores_info[vendedor_uuid] = {
+                        'nombre': nombre,
+                        'tipo': 'mesero'
+                    }
+                else:
+                    # Es admin - buscar en miembros directamente
+                    nombre = miembros_dict.get(vendedor_uuid, 'Administrador')
+                    vendedores_info[vendedor_uuid] = {
+                        'nombre': nombre,
+                        'tipo': 'admin'
+                    }
+        
         
         items = []
         
         for mov_data in (movimientos_result.data or []):
             mov = cast(Dict[str, Any], mov_data)
-            items.append({
+            item = {
                 'uuid': mov.get('uuid'),
                 'fecha': mov.get('fecha'),
                 'tipo': mov.get('tipo'),
@@ -157,11 +274,26 @@ async def get_movimientos_cuenta(
                 'descripcion': mov.get('descripcion'),
                 'venta_uuid': mov.get('venta_uuid'),
                 'metodo_pago': mov.get('metodo_pago')
-            })
+            }
+            
+            # Agregar información del vendedor
+            # Primero intentar con venta_uuid (para cargos)
+            venta_uuid = mov.get('venta_uuid')
+            if venta_uuid and venta_uuid in ventas_vendedores:
+                vendedor_uuid = ventas_vendedores[venta_uuid]
+                if vendedor_uuid and vendedor_uuid in vendedores_info:
+                    item['vendedor'] = vendedores_info[vendedor_uuid]
+            # Si no hay venta, usar created_by_uuid (para pagos/ajustes)
+            elif mov.get('created_by_uuid'):
+                created_by = mov.get('created_by_uuid')
+                if created_by in vendedores_info:
+                    item['vendedor'] = vendedores_info[created_by]
+            
+            items.append(item)
         
         for venta_data in (ventas_pagadas_result.data or []):
             venta = cast(Dict[str, Any], venta_data)
-            items.append({
+            item = {
                 'uuid': venta.get('uuid'),
                 'fecha': venta.get('created_at'),
                 'tipo': 'venta_pagada',
@@ -169,7 +301,14 @@ async def get_movimientos_cuenta(
                 'descripcion': f"Venta #{venta.get('numero_ticket')} pagada directamente",
                 'venta_uuid': venta.get('uuid'),
                 'numero_ticket': venta.get('numero_ticket')
-            })
+            }
+            
+            # Agregar información del vendedor
+            vendedor_uuid = venta.get('vendedor_uuid')
+            if vendedor_uuid and vendedor_uuid in vendedores_info:
+                item['vendedor'] = vendedores_info[vendedor_uuid]
+            
+            items.append(item)
         
         items.sort(key=lambda x: x.get('fecha', ''), reverse=True)
         

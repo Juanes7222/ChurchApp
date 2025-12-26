@@ -41,7 +41,9 @@ import {
   FileText,
   Plus,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  Briefcase,
+  User
 } from 'lucide-react';
 
 // API functions
@@ -392,9 +394,9 @@ const CuentaDetailPage = () => {
                     {/* Indicador de timeline */}
                     <div className={`absolute left-3 top-4 w-6 h-6 rounded-full border-4 border-white ${
                       movimiento.tipo === 'cargo' ? 'bg-red-500' :
-                      movimiento.tipo === 'pago' ? 'bg-green-500' :
+                      movimiento.tipo === 'pago' ? 'bg-blue-500' :
                       movimiento.tipo === 'venta_pagada' ? 'bg-emerald-500' :
-                      'bg-blue-500'
+                      'bg-purple-500'
                     } shadow-md z-10`}>
                       <div className="absolute inset-0 flex items-center justify-center">
                         {getMovimientoIcon(movimiento.tipo, 'w-3 h-3 text-white')}
@@ -402,58 +404,62 @@ const CuentaDetailPage = () => {
                     </div>
 
                     {/* Tarjeta del movimiento con acordeón */}
-                    <Card className={`shadow-sm hover:shadow-md transition-shadow ${
+                    <Card className={`shadow-sm hover:shadow-md transition-shadow overflow-hidden ${
                       movimiento.tipo === 'cargo' ? 'border-l-4 border-l-red-500' :
-                      movimiento.tipo === 'pago' ? 'border-l-4 border-l-green-500' :
+                      movimiento.tipo === 'pago' ? 'border-l-4 border-l-blue-500' :
                       movimiento.tipo === 'venta_pagada' ? 'border-l-4 border-l-emerald-500' :
-                      'border-l-4 border-l-blue-500'
+                      'border-l-4 border-l-purple-500'
                     }`}>
                       <Accordion type="single" collapsible>
                         <AccordionItem value="detalles" className="border-none">
-                          <AccordionTrigger className="px-4 pt-4 pb-2 hover:no-underline">
-                            <div className="flex items-start justify-between w-full pr-2">
-                              <div className="flex-1 text-left">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Badge variant={getMovimientoBadgeVariant(movimiento.tipo)} className="text-xs flex items-center gap-1">
+                          <AccordionTrigger className="px-3 sm:px-4 pt-3 sm:pt-4 pb-2 hover:no-underline">
+                            <div className="flex flex-col sm:flex-row items-start justify-between w-full pr-2 gap-2">
+                              <div className="flex-1 text-left min-w-0 w-full">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                  <Badge variant={getMovimientoBadgeVariant(movimiento.tipo)} className="text-xs flex items-center gap-1 flex-shrink-0">
                                     {movimiento.tipo === 'cargo' ? (
-                                      <><ShoppingCart className="h-3 w-3" /> COMPRA AL CRÉDITO</>
+                                      <><ShoppingCart className="h-3 w-3" /> <span className="hidden sm:inline">COMPRA</span><span className="sm:hidden">COMPRA</span></>
                                     ) : movimiento.tipo === 'pago' ? (
                                       <><CreditCard className="h-3 w-3" /> PAGO</>
                                     ) : movimiento.tipo === 'venta_pagada' ? (
-                                      <><CheckCircle2 className="h-3 w-3" /> COMPRA PAGADA</>
+                                      <><CheckCircle2 className="h-3 w-3" /> <span className="hidden sm:inline">PAGADA</span><span className="sm:hidden">PAGADA</span></>
                                     ) : (
                                       <><FileText className="h-3 w-3" /> AJUSTE</>
                                     )}
                                   </Badge>
-                                  <span className="text-xs text-gray-500">
+                                  <span className="text-xs text-gray-500 truncate">
                                     {new Date(movimiento.fecha).toLocaleString('es-ES', {
-                                      dateStyle: 'medium',
-                                      timeStyle: 'short'
+                                      day: '2-digit',
+                                      month: '2-digit',
+                                      year: '2-digit',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
                                     })}
                                   </span>
                                 </div>
                                 {movimiento.descripcion && (
-                                  <p className="text-sm text-gray-600 font-medium">
+                                  <p className="text-xs sm:text-sm text-gray-600 font-medium truncate">
                                     {movimiento.descripcion}
                                   </p>
                                 )}
                               </div>
-                              <div className="text-right ml-4">
-                                <p className={`text-2xl font-bold ${
+                              <div className="text-right sm:ml-4 flex-shrink-0">
+                                <p className={`text-xl sm:text-2xl font-bold whitespace-nowrap ${
                                   movimiento.tipo === 'cargo' ? 'text-red-600' : 
-                                  movimiento.tipo === 'pago' ? 'text-green-600' : 
+                                  movimiento.tipo === 'pago' ? 'text-blue-600' : 
                                   movimiento.tipo === 'venta_pagada' ? 'text-emerald-600' : 
-                                  'text-blue-600'
+                                  movimiento.monto >= 0 ? 'text-purple-600' : 'text-green-600'
                                 }`}>
                                   {movimiento.tipo === 'cargo' ? '+' : 
-                                   movimiento.tipo === 'pago' ? '-' : ''}
+                                   movimiento.tipo === 'pago' ? '-' : 
+                                   movimiento.tipo === 'ajuste' ? (movimiento.monto >= 0 ? '+' : '-') : ''}
                                   ${Math.abs(movimiento.monto || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
                                 </p>
                               </div>
                             </div>
                           </AccordionTrigger>
                           
-                          <AccordionContent className="px-4 pb-4">
+                          <AccordionContent className="px-3 sm:px-4 pb-3 sm:pb-4">
                             {/* Detalles de la compra (para cargos y ventas pagadas con UUID) */}
                             {(movimiento.tipo === 'cargo' || movimiento.tipo === 'venta_pagada') && movimiento.venta_uuid && (
                               <VentaDetail ventaUuid={movimiento.venta_uuid} esPagada={movimiento.tipo === 'venta_pagada'} />
@@ -461,20 +467,33 @@ const CuentaDetailPage = () => {
 
                             {/* Información adicional */}
                             <div className="mt-3 pt-3 border-t border-gray-100">
-                              <div className="flex items-center justify-between text-xs text-gray-500">
-                                <div className="flex items-center gap-4">
-                                  <span className="font-mono">
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-gray-500">
+                                <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                                  <span className="font-mono text-xs truncate">
                                     ID: {movimiento.uuid?.slice(0, 8)}
                                   </span>
                                   {movimiento.numero_ticket && (
-                                    <span className="flex items-center gap-1">
+                                    <span className="flex items-center gap-1 flex-shrink-0">
                                       <FileText className="h-3 w-3" />
                                       Ticket #{movimiento.numero_ticket}
                                     </span>
                                   )}
+                                  {movimiento.vendedor && (
+                                    <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                                      {movimiento.vendedor.tipo === 'admin' ? (
+                                        <Briefcase className="h-3 w-3" />
+                                      ) : (
+                                        <User className="h-3 w-3" />
+                                      )}
+                                      {movimiento.vendedor.nombre}
+                                      <span className="text-[10px] opacity-70">
+                                        ({movimiento.vendedor.tipo === 'admin' ? 'Admin' : 'Mesero'})
+                                      </span>
+                                    </Badge>
+                                  )}
                                 </div>
                                 {movimiento.tipo === 'pago' && movimiento.metodo_pago && (
-                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                  <Badge variant="outline" className="text-xs flex items-center gap-1 flex-shrink-0">
                                     {movimiento.metodo_pago === 'efectivo' ? (
                                       <><DollarSign className="h-3 w-3" /> Efectivo</>
                                     ) : movimiento.metodo_pago === 'transferencia' ? (
@@ -705,37 +724,37 @@ const VentaDetail = ({ ventaUuid, esPagada = false }) => {
   const totalColor = esPagada ? 'text-emerald-600' : 'text-red-600';
 
   return (
-    <div className={`mt-3 bg-gradient-to-br ${bgColor} rounded-lg p-4 border border-gray-200`}>
+    <div className={`mt-3 bg-gradient-to-br ${bgColor} rounded-lg p-3 sm:p-4 border border-gray-200`}>
       <div className="flex items-center gap-2 mb-3">
-        <div className={`${iconBgColor} p-2 rounded-lg`}>
+        <div className={`${iconBgColor} p-2 rounded-lg flex-shrink-0`}>
           <ShoppingCart className={`h-4 w-4 ${iconTextColor}`} />
         </div>
-        <h5 className="font-bold text-sm text-gray-800">
+        <h5 className="font-bold text-xs sm:text-sm text-gray-800">
           Productos Comprados {esPagada && <span className="text-emerald-600">(Pagado)</span>}
         </h5>
       </div>
       
       <div className="space-y-2">
         {venta.items.map((item, idx) => (
-          <div key={idx} className="bg-white rounded-lg p-3 shadow-sm">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <p className="font-semibold text-gray-900">
+          <div key={idx} className="bg-white rounded-lg p-2 sm:p-3 shadow-sm overflow-hidden">
+            <div className="flex justify-between items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm sm:text-base text-gray-900 truncate">
                   {item.productos?.nombre || 'Producto'}
                 </p>
-                <div className="flex items-center gap-3 mt-1 text-xs text-gray-600">
-                  <span className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1 text-xs text-gray-600">
+                  <span className="flex items-center gap-1 whitespace-nowrap">
                     <span className="font-semibold">Cantidad:</span>
                     {item.cantidad}
                   </span>
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 whitespace-nowrap">
                     <span className="font-semibold">Precio Unit:</span>
                     ${item.precio_unitario?.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
                   </span>
                 </div>
               </div>
-              <div className="text-right ml-3">
-                <p className="text-lg font-bold text-gray-900">
+              <div className="text-right flex-shrink-0">
+                <p className="text-base sm:text-lg font-bold text-gray-900 whitespace-nowrap">
                   ${(item.precio_unitario * item.cantidad).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
                 </p>
               </div>
@@ -745,9 +764,9 @@ const VentaDetail = ({ ventaUuid, esPagada = false }) => {
       </div>
       
       <div className="mt-3 pt-3 border-t-2 border-gray-300">
-        <div className="flex justify-between items-center">
-          <span className="text-sm font-bold text-gray-700">Total de la Compra:</span>
-          <span className={`text-xl font-bold ${totalColor}`}>
+        <div className="flex justify-between items-center gap-2">
+          <span className="text-xs sm:text-sm font-bold text-gray-700">Total de la Compra:</span>
+          <span className={`text-lg sm:text-xl font-bold ${totalColor} whitespace-nowrap`}>
             ${venta.total?.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
           </span>
         </div>

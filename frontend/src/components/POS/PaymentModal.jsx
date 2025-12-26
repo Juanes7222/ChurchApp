@@ -10,7 +10,6 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Separator } from '../ui/separator';
 import { 
   DollarSign, 
   Smartphone,
@@ -92,9 +91,9 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
   const { mutate: procesarVenta, isPending } = useMutation({
     mutationFn: createVenta,
     onSuccess: (data) => {
-      toast.success('Venta procesada exitosamente', {
-        description: `Ticket #${data.numero_ticket}`,
-      });
+      // toast.success('Venta procesada exitosamente', {
+      //   description: `Ticket #${data.numero_ticket}`,
+      // });
       
       // Invalidar queries relacionadas
       queryClient.invalidateQueries({ queryKey: ['ventas'] });
@@ -220,8 +219,8 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md max-h-[90vh] p-0 flex flex-col">
+        <DialogHeader className="p-4 sm:p-6 pb-2 sm:pb-3">
           <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
             Procesar Pago
@@ -231,14 +230,16 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 sm:space-y-4">
-          {/* Total a pagar */}
-          <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-center border-2 border-gray-200">
-            <p className="text-xs sm:text-sm text-gray-600 mb-1">Total a Pagar</p>
-            <p className="text-2xl sm:text-3xl font-bold text-green-600">
-              ${total.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
-            </p>
-          </div>
+        {/* Contenido con scroll */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6">
+          <div className="space-y-3 sm:space-y-4 pb-4">
+            {/* Total a pagar */}
+            <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-center border-2 border-gray-200">
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Total a Pagar</p>
+              <p className="text-2xl sm:text-3xl font-bold text-green-600">
+                ${total.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+              </p>
+            </div>
 
           {/* Selector de miembro */}
           <div>
@@ -282,7 +283,7 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
                         key={miembro.uuid}
                         className="w-full text-left p-2 hover:bg-gray-100 border-b last:border-b-0"
                         onClick={() => {
-                          ('Miembro seleccionado:', miembro);
+                          console.log('Miembro seleccionado:', miembro);
                           setSelectedMiembro(miembro);
                           setSearchMiembro('');
                           setMiembros([]);
@@ -351,80 +352,78 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              <Separator />
+              {/* Campos según método */}
+              {selectedMethod === 'efectivo' && (
+                <div className="space-y-2 sm:space-y-3">
+                  <div>
+                    <Label htmlFor="monto-recibido" className="text-xs sm:text-sm">Monto Recibido</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-base sm:text-lg">
+                        $
+                      </span>
+                      <Input
+                        id="monto-recibido"
+                        type="number"
+                        placeholder="0"
+                        value={montoRecibido}
+                        onChange={(e) => setMontoRecibido(e.target.value)}
+                        className="pl-7 text-base sm:text-lg font-medium h-11 sm:h-12"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
 
-          {/* Campos según método */}
-          {selectedMethod === 'efectivo' && (
-            <div className="space-y-2 sm:space-y-3">
-              <div>
-                <Label htmlFor="monto-recibido" className="text-xs sm:text-sm">Monto Recibido</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-base sm:text-lg">
-                    $
-                  </span>
-                  <Input
-                    id="monto-recibido"
-                    type="number"
-                    placeholder="0"
-                    value={montoRecibido}
-                    onChange={(e) => setMontoRecibido(e.target.value)}
-                    className="pl-7 text-base sm:text-lg font-medium h-11 sm:h-12"
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              {/* Vuelto */}
-              {montoRecibido && (
-                <div className={`p-2 sm:p-3 rounded-lg border-2 ${
-                  vuelto >= 0 ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm sm:text-base">
-                      {vuelto >= 0 ? 'Vuelto:' : 'Falta:'}
-                    </span>
-                    <span className={`text-lg sm:text-xl font-bold ${
-                      vuelto >= 0 ? 'text-green-700' : 'text-red-700'
+                  {/* Vuelto */}
+                  {montoRecibido && (
+                    <div className={`p-2 sm:p-3 rounded-lg border-2 ${
+                      vuelto >= 0 ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
                     }`}>
-                      ${Math.abs(vuelto).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
-                    </span>
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm sm:text-base">
+                          {vuelto >= 0 ? 'Vuelto:' : 'Falta:'}
+                        </span>
+                        <span className={`text-lg sm:text-xl font-bold ${
+                          vuelto >= 0 ? 'text-green-700' : 'text-red-700'
+                        }`}>
+                          ${Math.abs(vuelto).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Botones rápidos */}
+                  <div className="grid grid-cols-5 gap-1 sm:gap-2">
+                    {[2000, 5000, 10000, 20000, 50000].map((amount) => (
+                      <Button
+                        key={amount}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setMontoRecibido(String(amount))}
+                        className="text-xs h-8 px-1"
+                      >
+                        {amount >= 1000 ? `${amount/1000}k` : amount}
+                      </Button>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* Botones rápidos */}
-              <div className="grid grid-cols-5 gap-1 sm:gap-2">
-                {[2000, 5000, 10000, 20000, 50000].map((amount) => (
-                  <Button
-                    key={amount}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setMontoRecibido(String(amount))}
-                    className="text-xs h-8 px-1"
-                  >
-                    {amount >= 1000 ? `${amount/1000}k` : amount}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {selectedMethod === 'transferencia' && (
-            <div>
-              <Label htmlFor="referencia">Número de Referencia</Label>
-              <Input
-                id="referencia"
-                type="text"
-                placeholder="Últimos 4 dígitos o código"
-                value={referencia}
-                onChange={(e) => setReferencia(e.target.value)}
-                autoFocus
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Ingresa el código de autorización
-              </p>
-            </div>
-          )}
+              {selectedMethod === 'transferencia' && (
+                <div>
+                  <Label htmlFor="referencia">Número de Referencia</Label>
+                  <Input
+                    id="referencia"
+                    type="text"
+                    placeholder="Últimos 4 dígitos o código"
+                    value={referencia}
+                    onChange={(e) => setReferencia(e.target.value)}
+                    autoFocus
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Ingresa el código de autorización
+                  </p>
+                </div>
+              )}
             </>
           )}
 
@@ -445,20 +444,23 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
               La venta se procesará inmediatamente y se registrará en el sistema.
             </p>
           </div>
+          </div>
+        </div>
 
-          {/* Botones de acción */}
-          <div className="flex gap-2 pt-2">
+        {/* Botones de acción fijos en la parte inferior */}
+        <div className="border-t bg-white p-4 sm:p-6 pt-3 sm:pt-4">
+          <div className="flex gap-2">
             <Button
               variant="outline"
               onClick={onClose}
-              className="flex-1 h-10 sm:h-auto"
+              className="flex-1 h-11 sm:h-12"
               disabled={isPending}
             >
               Cancelar
             </Button>
             <Button
               onClick={handleConfirmPayment}
-              className="flex-1 bg-green-600 hover:bg-green-700 h-10 sm:h-auto"
+              className="flex-1 bg-green-600 hover:bg-green-700 h-11 sm:h-12"
               disabled={isPending}
             >
               {isPending ? (
@@ -482,7 +484,7 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
         open={showRegistroTemporal}
         onOpenChange={setShowRegistroTemporal}
         onClienteCreado={(nuevoCliente) => {
-          ('Cliente temporal creado:', nuevoCliente);
+          console.log('Cliente temporal creado:', nuevoCliente);
           setSelectedMiembro(nuevoCliente);
           toast.info('Cliente registrado temporalmente', {
             description: 'Requiere verificación de administrador'

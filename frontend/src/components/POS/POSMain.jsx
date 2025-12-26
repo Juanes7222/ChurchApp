@@ -162,7 +162,7 @@ export default function POSMain() {
       )}
 
       {/* Toast Notifications */}
-      <Toaster position="top-right" richColors />
+      <Toaster position="bottom-right" richColors />
     </div>
   );
 }

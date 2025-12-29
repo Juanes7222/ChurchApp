@@ -77,7 +77,6 @@ const POSVentasPage = () => {
           nombre: userData.nombre || user.email,
           tipo: 'admin'
         };
-        ('Inicializando vendedor admin:', adminVendedor);
         initializeShift(currentShift, adminVendedor);
       }
     }

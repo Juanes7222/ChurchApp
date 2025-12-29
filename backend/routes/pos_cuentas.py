@@ -6,7 +6,8 @@ RF-CUENTA
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any, Optional, cast
 from core import config
-from utils.auth import require_auth_user, require_admin
+from utils.auth import require_pos_access, require_permission, require_admin
+from utils.permissions import Permission
 from datetime import datetime, timezone
 from decimal import Decimal
 import logging
@@ -22,7 +23,7 @@ supabase = config.supabase
 async def list_cuentas_miembro(
     con_saldo: Optional[bool] = None,
     q: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_pos_access)
 ) -> Dict[str, Any]:
     """Listar cuentas de miembros con saldos"""
     try:
@@ -57,7 +58,7 @@ async def list_cuentas_miembro(
 @pos_cuentas_router.get("/cuentas/{miembro_uuid}")
 async def get_cuenta_miembro(
     miembro_uuid: str,
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_pos_access)
 ) -> Dict[str, Any]:
     """Obtener cuenta de un miembro específico con resumen financiero"""
     try:
@@ -129,7 +130,7 @@ async def get_movimientos_cuenta(
     miembro_uuid: str,
     limit: int = 50,
     offset: int = 0,
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_pos_access)
 ) -> Dict[str, Any]:
     """Obtener historial completo de movimientos de una cuenta con paginación"""
     try:
@@ -334,7 +335,7 @@ async def registrar_abono(
     monto: Decimal,
     metodo_pago: str = "efectivo",
     notas: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(require_admin)
+    current_user: Dict[str, Any] = Depends(require_permission(Permission.MANAGE_PAYMENTS))
 ) -> Dict[str, Any]:
     """RF-CUENTA-01: Registrar abono a cuenta de miembro"""
     try:
@@ -412,7 +413,7 @@ async def crear_ajuste_cuenta(
     miembro_uuid: str,
     monto: Decimal,
     justificacion: str,
-    current_user: Dict[str, Any] = Depends(require_admin)
+    current_user: Dict[str, Any] = Depends(require_permission(Permission.MANAGE_PAYMENTS))
 ) -> Dict[str, Any]:
     """Crear ajuste administrativo en cuenta de miembro"""
     try:

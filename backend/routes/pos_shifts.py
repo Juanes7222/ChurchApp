@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any, Optional, cast
 from models.models import CajaShiftCreate, CajaShiftClose
 from core import config
-from utils.auth import require_admin, require_auth_user, require_any_authenticated
+from utils.auth import require_admin, require_auth_user, require_any_authenticated, require_pos_access
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 import logging
@@ -24,7 +24,7 @@ supabase = config.supabase
 @pos_shifts_router.post("/caja-shifts")
 async def open_shift(
     shift: CajaShiftCreate,
-    current_user: Dict[str, Any] = Depends(require_admin)
+    current_user: Dict[str, Any] = Depends(require_pos_access)
 ) -> Dict[str, Any]:
     """RF-SHIFT-01: Abrir nuevo turno de caja y crear meseros temporales"""
     try:
@@ -171,7 +171,7 @@ async def open_shift(
 @pos_shifts_router.get("/caja-shifts/{shift_uuid}/summary")
 async def get_shift_summary(
     shift_uuid: str,
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_pos_access)
 ) -> Dict[str, Any]:
     """RF-SHIFT-02: Obtener resumen de turno para cierre"""
     try:
@@ -316,7 +316,7 @@ async def get_shift_summary(
 async def close_shift(
     shift_uuid: str,
     close_data: CajaShiftClose,
-    current_user: Dict[str, Any] = Depends(require_admin)
+    current_user: Dict[str, Any] = Depends(require_pos_access)
 ) -> Dict[str, Any]:
     """RF-SHIFT-02: Cerrar turno de caja con cálculo automático de efectivo"""
     try:

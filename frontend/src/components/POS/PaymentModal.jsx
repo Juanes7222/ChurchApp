@@ -232,7 +232,6 @@ const PaymentModal = ({ open, onClose, onSuccess }) => {
       }],
     };
 
-    ('Enviando venta:', JSON.stringify(ventaData, null, 2));
 
     // Enviar a la API
     procesarVenta(ventaData);

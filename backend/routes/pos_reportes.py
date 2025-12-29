@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional, cast
 from core import config
 from utils.auth import require_admin, require_pos_access, require_permission, require_auth_user
 from utils.permissions import Permission
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 import logging
 
@@ -140,17 +140,17 @@ async def reporte_ventas(
 ) -> Dict[str, Any]:
     """RF-REPORT-02: Reporte de ventas por rango y producto"""
     try:
-        # No incluir JOIN con vendedor ya que puede ser mesero o miembro
-        query = supabase.table('ventas').select('*, venta_items(*)').eq('is_deleted', False)
+        query = supabase.table('ventas').select('*,venta_items(*)')
+        query = query.eq('is_deleted', False)  # Sin 'ventas.' prefijo
         
         if fecha_desde:
-            query = query.gte('fecha_hora', fecha_desde)
+            # Agregar offset de Colombia (-5 horas) para buscar en UTC
+            query = query.gte('fecha_hora', f"{fecha_desde} 05:00:00")
         
         if fecha_hasta:
-            query = query.lte('fecha_hora', fecha_hasta)
-        
-        if vendedor_uuid:
-            query = query.eq('vendedor_uuid', vendedor_uuid)
+            # Fin del día en Colombia = 04:59:59 del día siguiente en UTC
+            fecha_siguiente = (datetime.strptime(fecha_hasta, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+            query = query.lt('fecha_hora', f"{fecha_siguiente} 05:00:00")
         
         query = query.order('fecha_hora', desc=True)
         result = query.execute()
@@ -227,14 +227,16 @@ async def reporte_productos(
         query = query.eq('ventas.is_deleted', False)
         
         if fecha_desde:
-            query = query.gte('ventas.fecha_hora', fecha_desde)
+            # Agregar offset de Colombia (-5 horas) para buscar en UTC
+            query = query.gte('ventas.fecha_hora', f"{fecha_desde} 05:00:00")
         
         if fecha_hasta:
-            query = query.lte('ventas.fecha_hora', fecha_hasta)
+            # Fin del día en Colombia = 04:59:59 del día siguiente en UTC
+            fecha_siguiente = (datetime.strptime(fecha_hasta, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+            query = query.lt('ventas.fecha_hora', f"{fecha_siguiente} 05:00:00")
         
         result = query.execute()
         items = result.data or []
-        
         # Agrupar por producto
         productos_stats = {}
         for item in items:

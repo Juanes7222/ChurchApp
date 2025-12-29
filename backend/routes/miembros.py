@@ -73,14 +73,11 @@ async def create_miembro(miembro: MiembroCreate, current_user: Dict[str, Any] = 
         raise HTTPException(status_code=409, detail="Ya existe un miembro con este documento")
     
     data = miembro.model_dump()
-    print(f"DEBUG - Data to insert: {data}")  # Debug log
-    print(f"DEBUG - foto_url: {data.get('foto_url')}")  # Debug log
     data['uuid'] = str(uuid.uuid4())  # Generar UUID
     data['created_by'] = current_user['sub']
     data['updated_by'] = current_user['sub']
     
     result = supabase.table('miembros').insert(data).execute()
-    print(f"DEBUG - Inserted data: {result.data[0]}")  # Debug log
     
     # Invalidar caché después de crear miembro
     invalidate_cache_pattern("miembros")

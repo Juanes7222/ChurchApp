@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any, Optional, cast
 from models.models import Venta
 from core import config
-from utils.auth import require_auth_user, require_any_authenticated, require_admin
+from utils.auth import require_pos_access, require_any_authenticated, require_admin
 from datetime import datetime, timezone
 from decimal import Decimal
 import logging
@@ -59,6 +59,7 @@ async def create_venta(
                 raise HTTPException(status_code=403, detail="Usuario temporal no autorizado")
         else:
             vendedor_uuid = current_user.get('miembro_uuid')
+            print(f"DEBUG - vendedor_uuid: {current_user}")  # Debug log
             if not vendedor_uuid:
                 raise HTTPException(status_code=400, detail="Usuario sin miembro_uuid asignado")
         
@@ -163,7 +164,7 @@ async def list_ventas(
     estado: Optional[str] = None,
     page: int = 1,
     page_size: int = 50,
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_pos_access)
 ) -> Dict[str, Any]:
     """RF-REPORT-02: Listar ventas con filtros"""
     try:
@@ -199,7 +200,7 @@ async def list_ventas(
 @pos_ventas_router.get("/ventas/{venta_uuid}")
 async def get_venta(
     venta_uuid: str,
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_pos_access)
 ) -> Dict[str, Any]:
     """Obtener detalle de venta con items y pagos"""
     try:
@@ -226,7 +227,7 @@ async def get_venta(
 @pos_ventas_router.get("/ventas/{venta_uuid}/detalle")
 async def get_venta_detalle(
     venta_uuid: str,
-    current_user: Dict[str, Any] = Depends(require_auth_user)
+    current_user: Dict[str, Any] = Depends(require_pos_access)
 ) -> Dict[str, Any]:
     """Obtener detalle completo de una venta incluyendo items y productos"""
     try:

@@ -104,6 +104,7 @@ async def consume_invite(req: ConsumeInviteRequest):
             'INVITE_EXPIRED': 'Esta invitación ha expirado',
             'EMAIL_MISMATCH': 'El email no coincide con la invitación'
         }
+    
         
         if result.data != 'OK':
             error_detail = error_messages.get(result.data, result.data)
@@ -118,13 +119,45 @@ async def consume_invite(req: ConsumeInviteRequest):
         user_data = cast(Dict[str, Any], user_result.data[0])
         role = str(user_data.get('role', ''))
         
+        full_name = decoded_token.get('name', '').split(' ')
+        name = full_name[0:2] if len(full_name) > 0 and len(full_name) == 4 else full_name[0]
+        name =  ' '.join(name)
+        last_name = ' '.join(full_name[2:]) if len(full_name) == 4 else ' '.join(full_name[1:])
+                        
+        # Si no tiene miembro_uuid, crearlo y asociarlo
+        if not user_data.get('miembro_uuid'):
+            # Generar un UUID válido para la tabla miembros (evita errores si la columna espera UUID)
+            miembro_uuid = str(uuid.uuid4())
+
+            miembro_result = config.supabase.table('miembros').insert({
+                "nombres": name,
+                "uuid": miembro_uuid,
+                "documento": "TEMP-" + google_uid[:8],
+                "tipo_documento": "TEMP",
+                "apellidos": last_name,
+                "email": email,
+                "created_by": google_uid
+            }).execute()
+
+            if not miembro_result.data or len(miembro_result.data) == 0:
+                raise HTTPException(status_code=500, detail="No se pudo crear el miembro")
+
+            # Actualiza el usuario con el miembro_uuid recién creado
+            update_res = config.supabase.table('app_users').update({"miembro_uuid": miembro_uuid}).eq("uid", google_uid).execute()
+            logger.info(f"Updated app_users with miembro_uuid: {miembro_uuid}, update_res: {update_res.data}")
+        else:
+            miembro_uuid = user_data.get('miembro_uuid')
+                
         logger.info(f"User created successfully with role: {role}")
+        
+        print(f"DEBUG - miembro_uuid: {miembro_uuid}")  # Debug log
         
         access_token = create_access_token(
             data={
                 "sub": google_uid,
                 "email": email,
-                "role": role
+                "role": role,
+                "miembro_uuid": miembro_uuid
             }
         )
         
@@ -133,7 +166,8 @@ async def consume_invite(req: ConsumeInviteRequest):
             user={
                 "uid": google_uid,
                 "email": email,
-                "role": role
+                "role": role,
+                "miembro_uuid": miembro_uuid
             }
         )
 
@@ -142,4 +176,3 @@ async def consume_invite(req: ConsumeInviteRequest):
     except Exception as e:
         logger.error(f"Consume invite error: {e}")
         raise HTTPException(status_code=500, detail=f"Error al procesar invitación: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))

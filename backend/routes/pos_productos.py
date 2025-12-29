@@ -8,8 +8,7 @@ from typing import Dict, Any, Optional, cast
 from models.models import ProductoCreate, CategoriaProducto
 from core import config
 from core.cache import cached, invalidate_cache_pattern
-from utils.auth import require_admin
-from datetime import datetime, timezone
+from utils.auth import require_admin, require_pos_access
 import logging
 import uuid as uuid_lib
 
@@ -60,7 +59,7 @@ async def list_productos(
 @pos_productos_router.post("/productos")
 async def create_producto(
     producto: ProductoCreate,
-    current_user: Dict[str, Any] = Depends(require_admin)
+    current_user: Dict[str, Any] = Depends(require_pos_access)
 ) -> Dict[str, Any]:
     """RF-PROD-01: Crear nuevo producto (admin/TI)"""
     try:
@@ -120,7 +119,7 @@ async def create_producto(
 async def update_producto(
     producto_uuid: str,
     producto: ProductoCreate,
-    current_user: Dict[str, Any] = Depends(require_admin)
+    current_user: Dict[str, Any] = Depends(require_pos_access)
 ) -> Dict[str, Any]:
     """RF-PROD-01: Actualizar producto existente"""
     try:
